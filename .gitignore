@@ -2,7 +2,6 @@
 node_modules
 .parcel-cache
 dist
-dist-react
 yarn-error.log
 dist-custom
 dist-preview

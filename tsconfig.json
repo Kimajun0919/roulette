@@ -12,5 +12,5 @@
     "experimentalDecorators": true,
     "types": ["vite/client"]
   },
-  "include": ["src-react", "vite.react.config.ts"]
+  "include": ["src", "vite.react.config.ts"]
 }

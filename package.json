@@ -17,7 +17,7 @@
     "workbox-build": "7.4.0"
   },
   "scripts": {
-    "lint": "biome check --fix src-react/",
+    "lint": "biome check --fix src/",
     "dev": "vite --config vite.react.config.ts --port 1236",
     "build": "vite build --config vite.react.config.ts",
     "preview": "vite preview --config vite.react.config.ts --port 4174"
