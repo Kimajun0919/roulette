@@ -1,5 +1,5 @@
-import options from '../../src/options';
 import { registerServiceWorker } from '../../src/registerServiceWorker';
+import { Marble } from '../../src/marble';
 import { Roulette } from '../../src/roulette';
 import { Themes } from '../../src/data/constants';
 
@@ -58,7 +58,7 @@ export class RouletteEngineAdapter {
   }
 
   setUseSkills(enabled: boolean) {
-    options.useSkills = enabled;
+    Marble.setSkillsEnabled(enabled);
   }
 
   start() {

@@ -1,6 +1,5 @@
 import { Skills, STUCK_DELAY, Themes } from './data/constants';
 import type { IPhysics } from './IPhysics';
-import options from './options';
 import type { ColorTheme } from './types/ColorTheme';
 import type { VectorLike } from './types/VectorLike';
 import { transformGuard } from './utils/transformGuard';
@@ -8,6 +7,11 @@ import { rad } from './utils/utils';
 import { Vector } from './utils/Vector';
 
 export class Marble {
+  static skillsEnabled = true;
+
+  static setSkillsEnabled(enabled: boolean) {
+    Marble.skillsEnabled = enabled;
+  }
   type = 'marble' as const;
   name: string = '';
   size: number = 0.5;
@@ -90,7 +94,7 @@ export class Marble {
       this.impact = Math.max(0, this.impact - deltaTime);
     }
     if (!this.isActive) return;
-    if (options.useSkills) {
+    if (Marble.skillsEnabled) {
       this._updateSkillInformation(deltaTime);
     }
   }
@@ -173,7 +177,7 @@ export class Marble {
       this._drawOutline(ctx, 2 / zoom);
     }
 
-    if (options.useSkills) {
+    if (Marble.skillsEnabled) {
       this._renderCoolTime(ctx, zoom);
     }
   }
