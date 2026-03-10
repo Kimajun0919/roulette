@@ -1,202 +1,135 @@
 # Marble Roulette
 
-구슬 물리 시뮬레이션(Box2D) 기반 추첨 앱입니다.  
-현재 구조는 **React + Vite 단일 엔트리**로 정리되어 있으며, UI 레이어는 React 컴포넌트 중심으로 동작합니다.
+Box2D 기반 구슬 물리 시뮬레이션으로 당첨자를 뽑는 추첨 앱입니다.
+현재 프로젝트는 **React + Vite 단일 앱 구조**이며, UI는 React 컴포넌트로, 물리/렌더는 `engine-core`로 분리되어 있습니다.
 
----
+## 주요 기능
 
-## 1) 핵심 기능
+- 추첨 방식: `first` / `last` / `custom`
+- 속도/스킬/자동 녹화 옵션
+- 맵 변경, 라이트/다크 테마
+- 오버레이 UI
+  - 랭킹 오버레이
+  - 미니맵(hover로 카메라 이동)
+  - Fast Forward(누르고 있는 동안 2x)
+  - 당첨자 스포트라이트 + 녹화 파일 다운로드
+- Haneulbit API 모드
+  - 승인된 attendance 횟수를 가중치(`name*count`)로 반영
+  - `super_admin` 권한 확인
 
-- 구슬 기반 추첨 (물리 엔진: `box2d-wasm`)
-- 당첨 방식 선택
-  - 첫 번째 (`first`)
-  - 마지막 (`last`)
-  - N번째 (`custom`)
-- 속도 제어, 스킬 사용 여부, 자동 녹화 옵션
-- 맵/테마 선택
-- 결과 순위 표시 (React UI)
-- 미니맵 + 뷰포트 이동 (React UI)
-- Fast Forward(누르고 있는 동안 2x) (React UI)
-- Haneulbit API 모드 (참석 승인 횟수 기반 가중치)
-  - `name*count` 형태로 추첨 가중치 반영
-  - `super_admin` 권한 확인 포함
-
----
-
-## 2) 기술 스택
+## 기술 스택
 
 - React 18
 - TypeScript
 - Vite 5
 - box2d-wasm
-- Biome (lint/format)
+- Biome
 
----
-
-## 3) 실행 방법
-
-### 요구사항
-
-- Node.js 18+
-- npm
-
-### 설치
+## 실행
 
 ```bash
 npm install
-```
-
-### 개발 서버
-
-```bash
 npm run dev
 ```
 
-- 기본 주소: `http://localhost:1236`
+- Dev: `http://localhost:1236`
 
-### 빌드
+## 빌드/검증
 
 ```bash
 npm run build
-```
-
-- 산출물: `dist/`
-
-### 프리뷰
-
-```bash
 npm run preview
-```
-
-- 기본 주소: `http://localhost:4174`
-
-### 린트
-
-```bash
 npm run lint
 ```
 
----
+- Build output: `dist/`
+- Preview: `http://localhost:4174`
 
-## 4) 프로젝트 구조
+## 프로젝트 구조
 
 ```text
 src/
-  main.tsx                     # React entry
-  App.tsx                      # 화면 조립
-  styles.css                   # 전역 스타일
+  main.tsx
+  App.tsx
+  styles.css
 
   components/
-    ApiModeCard.tsx            # API 모드 UI
-    DrawOptionsCard.tsx        # 추첨/속도/옵션 UI
-    EngineStatusCard.tsx       # 엔진 상태 UI
-    MapThemeCard.tsx           # 맵/테마 선택 UI
-    MinimapCard.tsx            # React 미니맵 UI
-    ParticipantsCard.tsx       # 참여자 입력 UI
-    RunCard.tsx                # 실행/리셋/FastForward UI
-    NextStepsCard.tsx          # 안내 UI
+    ApiModeCard.tsx
+    DrawOptionsCard.tsx
+    EngineStatusCard.tsx
+    FastForwardOverlay.tsx
+    MapThemeCard.tsx
+    MinimapCard.tsx
+    ParticipantsCard.tsx
+    RankingOverlay.tsx
+    RunCard.tsx
+    WinnerSpotlightCard.tsx
+    NextStepsCard.tsx
 
   store/
-    uiState.ts                 # reducer + state/action 타입
-    useRouletteUi.ts           # UI 상태 훅 + API 로딩 로직
+    uiState.ts
+    useRouletteUi.ts
 
   engine/
-    RouletteEngineAdapter.ts   # 엔진 어댑터 (React 친화 API)
-    useRouletteEngine.ts       # 엔진 생명주기/동기화 훅
+    RouletteEngineAdapter.ts
+    useRouletteEngine.ts
 
   engine-core/
-    roulette.ts                # 시뮬레이션 메인
-    rouletteRenderer.ts        # canvas 렌더
-    physics-box2d.ts           # 물리 연동
-    marble.ts                  # 구슬 로직
-    camera.ts                  # 카메라 제어
-    data/*                     # 상수/맵 alias
-    misc/*                     # recap 유틸
-    utils/*                    # 공통 유틸/녹화
+    roulette.ts
+    rouletteRenderer.ts
+    physics-box2d.ts
+    marble.ts
+    camera.ts
+    data/*
+    types/*
+    utils/*
 
   maps/
-    stages.ts                  # 맵 데이터(실체)
+    stages.ts
 
   api/
-    haneulbit.ts               # 외부 API 호출/가중치 생성
+    haneulbit.ts
 ```
 
----
+## 아키텍처 요약
 
-## 5) 아키텍처 요약
+1. `App.tsx`가 전체 화면(캔버스 + 설정 패널 + 오버레이) 조립
+2. `useRouletteUi`가 폼/설정 상태를 reducer로 관리
+3. `useRouletteEngine`이 엔진 생성/파괴 및 UI 동기화 담당
+4. `RouletteEngineAdapter`가 engine-core API를 React 친화적으로 래핑
+5. `engine-core`는 렌더/시뮬레이션만 담당
 
-1. React UI(`App.tsx`, `components/*`)가 사용자 입력을 받음
-2. `useRouletteUi`가 UI 상태(reducer) 관리
-3. `useRouletteEngine`이 엔진 생성/초기화/상태 동기화 담당
-4. `RouletteEngineAdapter`가 engine-core를 React에 맞게 래핑
-5. `engine-core`는 순수 시뮬레이션/렌더 책임만 가짐
+## API 모드
 
-> 원칙: **UI는 React**, 엔진은 상태/제어 API 제공.
+`ApiModeCard`에서 Base URL/Token 입력 후 attendance 데이터를 불러옵니다.
 
----
+호출 순서:
 
-## 6) API 모드 (Haneulbit)
-
-`ApiModeCard`에서 다음 정보를 입력합니다.
-
-- Base URL
-- Bearer Token
-
-호출 흐름:
-
-- `GET /api/users/me` → 권한 확인(`super_admin`)
+- `GET /api/users/me` (권한 확인)
 - `GET /api/users/`
 - `GET /api/attendance/?verification_status=approved`
-- `user_id`별 승인 횟수 집계 → `name*count` 변환
 
-실패 시 상태 문구(`apiStatus`)에 에러 표시.
+집계 결과를 `name*count`로 변환하여 참여자 입력에 반영합니다.
 
-환경변수 지원:
+환경변수:
 
-- `VITE_API_BASE_URL` (없으면 코드 기본값 사용)
+- `VITE_API_BASE_URL`
 
----
+## 회귀 체크리스트
 
-## 7) React 전환 상태
+- [ ] `npm run lint` 통과
+- [ ] `npm run build` 통과
+- [ ] local 모드 추첨(first/last/custom) 정상
+- [ ] Fast Forward hold 동작
+- [ ] 미니맵 hover 카메라 이동
+- [ ] API 모드 권한 에러/성공 케이스 확인
+- [ ] 자동 녹화 다운로드 링크 확인
 
-- 루트 엔트리: React (`index.html -> src/main.tsx`)
-- `src-react` → `src` 정리 완료
-- 빌드 출력: `dist/` 단일화
-- Parcel 관련 레거시 제거
-- Service Worker/Workbox 잔재 제거
-- 캔버스 오버레이 UI(랭킹/미니맵/패스트포워드) React UI로 이관 완료
+## 참고
 
----
+- 현재 엔진 동기화는 `useRouletteEngine`의 polling(100ms) 기반입니다.
+- 성능 최적화 시 이벤트 기반 동기화로 전환 여지가 있습니다.
 
-## 8) 점검 체크리스트 (회귀)
-
-아래 항목을 PR/배포 전 최소 1회 확인 권장:
-
-- [ ] `npm run build` 성공
-- [ ] Local 모드
-  - [ ] 이름 입력/셔플 정상
-  - [ ] first/last/custom 당첨 정상
-  - [ ] 속도 변경 반영
-  - [ ] 맵 변경 반영
-  - [ ] 테마 변경 반영
-  - [ ] FastForward(누르는 동안 2x) 동작
-  - [ ] 미니맵 hover 시 뷰포트 이동
-- [ ] API 모드
-  - [ ] super_admin 아닐 때 권한 에러 노출
-  - [ ] approved attendance 기반 가중치 반영
-- [ ] 자동 녹화 ON 시 다운로드 링크 생성
-
----
-
-## 9) 알려진 주의사항
-
-- 엔진 상태 동기화(`useRouletteEngine`)가 100ms polling 기반이므로,
-  데이터량이 매우 큰 경우 성능 튜닝 여지가 있습니다.
-- `engine-core/misc/recap*.ts`는 현재 메인 플로우에서 직접 사용되지 않을 수 있으므로,
-  필요 없으면 정리 대상 후보입니다.
-
----
-
-## 10) 라이선스
+## License
 
 MIT

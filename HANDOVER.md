@@ -1,115 +1,80 @@
-# 인수인계서 (Handover)
+# HANDOVER
 
-최종 업데이트: 2026-03-10
+최종 갱신: 2026-03-10 (main 기준)
 
-## 1. 현재 상태 요약
+## 1) 현재 브랜치/배포 기준
 
-- 브랜치: `feat/react-vite-migration-phase1`
-- 앱 엔트리: `index.html -> src/main.tsx` (React)
-- 소스 루트: `src/`
-- 빌드 산출물: `dist/`
-- 레거시 Parcel 엔트리/설정 제거 완료
-- SW/Workbox 제거 완료
-- UI 관련 주요 오버레이(랭킹/미니맵/패스트포워드) React 이관 완료
+- 기준 브랜치: `main`
+- 엔트리: `index.html -> src/main.tsx`
+- 빌드 출력: `dist/`
+- 패키지 매니저 기준: `npm` (`package-lock.json`)
 
----
+## 2) 현재 상태 요약
 
-## 2. 주요 설계 원칙
+- React + Vite 전환 완료
+- `src-react`/Parcel 레거시 정리 완료
+- Service Worker/Workbox 제거 완료
+- 캔버스 오버레이 UI를 React 컴포넌트로 운영 중
+  - `RankingOverlay`, `MinimapCard`, `FastForwardOverlay`, `WinnerSpotlightCard`
 
-1. **UI는 React**에서 처리
-2. **engine-core는 시뮬레이션/렌더 책임**으로 유지
-3. API 모드(Haneulbit attendance weight) 유지
-4. 파괴적 변경은 단계별 작은 커밋으로 진행
+## 3) 핵심 파일 인수 포인트
 
----
+### UI/상태
+- `src/App.tsx`: 전체 화면 레이아웃/상호작용 허브
+- `src/store/uiState.ts`: reducer, action, 초기 상태
+- `src/store/useRouletteUi.ts`: names 파싱, API 모드 로딩
 
-## 3. 핵심 모듈 인수인계
+### 엔진 브릿지
+- `src/engine/useRouletteEngine.ts`
+  - 엔진 lifecycle
+  - ranking/uiSnapshot/녹화 이벤트 동기화
+- `src/engine/RouletteEngineAdapter.ts`
+  - 엔진 메서드 래핑 (`setMap`, `setTheme`, `setFastForwardEnabled` 등)
 
-### 3.1 UI 상태
-- 파일: `src/store/uiState.ts`, `src/store/useRouletteUi.ts`
-- 역할:
-  - names/winner/speed/theme 등 UI 상태 관리
-  - API 모드 호출 후 weighted names로 변환
+### 엔진 코어
+- `src/engine-core/roulette.ts`: 메인 시뮬레이션 루프
+- `src/engine-core/rouletteRenderer.ts`: canvas 렌더
+  - React가 만든 `<canvas>`를 주입받아 사용 가능
+- `src/engine-core/physics-box2d.ts`: Box2D 연동
 
-### 3.2 엔진 브릿지
-- 파일: `src/engine/RouletteEngineAdapter.ts`, `src/engine/useRouletteEngine.ts`
-- 역할:
-  - 엔진 초기화/해제
-  - `ready`, `goal`, `message`, `recordingready` 이벤트 구독
-  - React에 필요한 snapshot/ranking 제공
+### API
+- `src/api/haneulbit.ts`
+  - 권한 체크(`super_admin`) + attendance 집계
 
-### 3.3 엔진 코어
-- 파일: `src/engine-core/*`
-- 역할:
-  - 물리(Box2D), 카메라, 렌더, 구슬 로직
-  - UI 렌더가 아닌 코어 시뮬레이션 중심
-
----
-
-## 4. 최근 정리 항목 (핵심)
-
-- `src-react` -> `src` 변경
-- `dist-react` -> `dist` 변경
-- `.parcelrc`, `recap_2025.html`, `.parcel-cache` 정리
-- `build-sw.js`, SW 등록 로직, `workbox-build` 제거
-- 캔버스 내부 UIObject 계층 제거
-  - 삭제: `UIObject.ts`, `fastForwader.ts`, `minimap.ts`, `rankRenderer.ts`, `types/mouseEvents.type.ts`
-  - 대체: `MinimapCard.tsx`, `RunCard`의 fast-forward 버튼, `App.tsx` ranking UI
-
----
-
-## 5. 점검 결과 (문서 작성 중 동시 점검)
-
-### 통과
-- `npm run build` 성공
-- 구조적으로 React 단일 엔트리 확인
-- 컴포넌트 레이어 존재/연결 정상
-
-### 부족/개선 포인트
-1. **엔진 동기화 방식 개선 여지**
-   - 현재 `useRouletteEngine`에서 100ms polling으로 ranking/uiSnapshot 동기화
-   - 개선안: 이벤트 기반 push(예: `uisnapshot` custom event)로 변경
-
-2. **미사용 가능 코드 정리 후보**
-   - `src/engine-core/misc/recap.ts`
-   - `src/engine-core/misc/recap-2025-data.ts`
-   - 실제 사용 여부 재검증 후 제거 고려
-
-3. **테스트 자동화 부재**
-   - 현재는 수동 회귀 위주
-   - 최소 smoke 테스트(E2E) 도입 권장
-
-4. **운영 가이드 문서 강화 필요**
-   - API 토큰 취급 방식(.env.sample, 권한 정책) 문서화 필요
-
----
-
-## 6. 다음 작업 우선순위 제안
-
-1) `useRouletteEngine` polling -> 이벤트 기반 리팩터링  
-2) recap 관련 파일 사용성 검증 후 정리  
-3) Playwright 기반 기본 시나리오 3~5개 추가  
-4) `.env.example` + 운영 가이드 보강
-
----
-
-## 7. 빠른 실행/검증 명령
+## 4) 운영/개발 명령
 
 ```bash
 npm install
 npm run dev
+npm run lint
 npm run build
 npm run preview
-npm run lint
 ```
 
----
+## 5) 문서 작성 시점 점검 결과
 
-## 8. 인수자 체크리스트
+### 정상
+- `npm run lint` 통과
+- `npm run build` 통과
 
-- [ ] 로컬에서 `npm run build` 통과 확인
-- [ ] Local 모드 추첨 플로우 확인
-- [ ] API 모드(super_admin / non-super_admin) 확인
-- [ ] 녹화 다운로드 링크 생성 확인
-- [ ] 미니맵 hover 카메라 이동 확인
-- [ ] FastForward 버튼(press/hold) 확인
+### 확인 필요/개선 후보
+1. `useRouletteEngine`의 100ms polling 동기화
+   - 이벤트 push 방식으로 변경 시 효율 개선 가능
+2. `src/engine-core/misc/recap*.ts` 실사용 여부 재검토
+3. 자동화 테스트(E2E smoke) 부재
+4. API 운영 가이드(`.env.example`, 토큰 보안 가이드) 보강 필요
+
+## 6) 권장 다음 작업
+
+1) 엔진 -> UI snapshot 이벤트 기반 전환  
+2) recap 파일 정리 여부 결정  
+3) Playwright smoke 시나리오 추가  
+4) API 모드 운영 문서 강화
+
+## 7) 인수 체크리스트
+
+- [ ] dev 서버 기동 확인 (`:1236`)
+- [ ] 추첨 시나리오(first/last/custom) 확인
+- [ ] FastForward / 미니맵 동작 확인
+- [ ] API 모드 권한/데이터 반영 확인
+- [ ] 녹화 다운로드 링크 확인
