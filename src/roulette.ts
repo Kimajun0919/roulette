@@ -19,6 +19,10 @@ import { bound } from './utils/bound.decorator';
 import { parseName, shuffle } from './utils/utils';
 import { VideoRecorder } from './utils/videoRecorder';
 
+type RouletteInitOptions = {
+  mountElement?: HTMLElement;
+};
+
 export class Roulette extends EventTarget {
   private _marbles: Marble[] = [];
 
@@ -35,6 +39,7 @@ export class Roulette extends EventTarget {
 
   protected _camera: Camera = new Camera();
   protected _renderer: RouletteRenderer;
+  private _mountElement?: HTMLElement;
 
   private _effects: GameObject[] = [];
 
@@ -60,15 +65,16 @@ export class Roulette extends EventTarget {
   }
 
   protected createRenderer(): RouletteRenderer {
-    return new RouletteRenderer();
+    return new RouletteRenderer(this._mountElement);
   }
 
   protected createFastForwader(): FastForwader {
     return new FastForwader();
   }
 
-  constructor() {
+  constructor(options?: RouletteInitOptions) {
     super();
+    this._mountElement = options?.mountElement;
     this._renderer = this.createRenderer();
     this._renderer.init().then(() => {
       this._init().then(() => {

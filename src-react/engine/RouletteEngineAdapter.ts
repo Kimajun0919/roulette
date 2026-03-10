@@ -8,9 +8,9 @@ export type WinnerType = 'first' | 'last' | 'custom';
 export class RouletteEngineAdapter {
   private roulette: Roulette;
 
-  constructor() {
+  constructor(mountElement?: HTMLElement) {
     registerServiceWorker();
-    this.roulette = new Roulette();
+    this.roulette = new Roulette({ mountElement });
   }
 
   get isReady() {

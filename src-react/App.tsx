@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { drawApi } from './api/client';
 import type { DrawRecord } from './api/types';
 import { DataSyncCard } from './components/DataSyncCard';
@@ -9,10 +9,12 @@ import { NextStepsCard } from './components/NextStepsCard';
 import { ParticipantsCard } from './components/ParticipantsCard';
 import { RunCard } from './components/RunCard';
 import type { WinnerType } from './engine/RouletteEngineAdapter';
-import { getEngine } from './legacyEngine';
+import type { RouletteEngineAdapter } from './engine/RouletteEngineAdapter';
+import { createEngine } from './legacyEngine';
 
 export function App() {
-  const [engine] = useState(() => getEngine());
+  const canvasHostRef = useRef<HTMLDivElement | null>(null);
+  const [engine, setEngine] = useState<RouletteEngineAdapter | null>(null);
   const [engineReady, setEngineReady] = useState(false);
   const [namesInput, setNamesInput] = useState('');
   const [winnerType, setWinnerType] = useState<WinnerType>('first');
@@ -29,10 +31,7 @@ export function App() {
 
   const apiBase = (import.meta.env.VITE_API_BASE_URL as string | undefined) || '';
 
-  const names = useMemo(
-    () => namesInput.split(/[\n,]/g).map((v) => v.trim()).filter(Boolean),
-    [namesInput]
-  );
+  const names = useMemo(() => namesInput.split(/[\n,]/g).map((v) => v.trim()).filter(Boolean), [namesInput]);
 
   const winnerRank = useMemo(() => {
     if (winnerType === 'first') return 1;
@@ -41,6 +40,13 @@ export function App() {
   }, [winnerRankInput, winnerType, names.length]);
 
   useEffect(() => {
+    if (!canvasHostRef.current || engine) return;
+    const mountedEngine = createEngine(canvasHostRef.current);
+    setEngine(mountedEngine);
+  }, [engine]);
+
+  useEffect(() => {
+    if (!engine) return;
     const checkReady = () => {
       if (engine.isReady) {
         setEngineReady(true);
@@ -59,33 +65,36 @@ export function App() {
     }
   }, [engine]);
 
-  useEffect(() => engine.onGoal((winner) => setGoalWinner(winner)), [engine]);
+  useEffect(() => {
+    if (!engine) return;
+    return engine.onGoal((winner) => setGoalWinner(winner));
+  }, [engine]);
 
   useEffect(() => {
-    if (!engineReady) return;
+    if (!engine || !engineReady) return;
     engine.setNames(names);
     engine.setWinnerRank(winnerRank, winnerType, names.length);
   }, [engine, engineReady, names, winnerRank, winnerType]);
 
   useEffect(() => {
-    if (!engineReady) return;
+    if (!engine || !engineReady) return;
     engine.setAutoRecording(autoRecording);
   }, [engine, engineReady, autoRecording]);
 
   useEffect(() => {
-    if (!engineReady) return;
+    if (!engine || !engineReady) return;
     engine.setTheme(theme);
   }, [engine, engineReady, theme]);
 
   const onStart = () => {
-    if (!engineReady) return;
+    if (!engine || !engineReady) return;
     setGoalWinner(null);
     engine.setWinnerRank(winnerRank, winnerType, names.length);
     engine.start();
   };
 
   const onReset = () => {
-    if (!engineReady) return;
+    if (!engine || !engineReady) return;
     setGoalWinner(null);
     engine.reset(names);
     engine.setWinnerRank(winnerRank, winnerType, names.length);
@@ -93,7 +102,7 @@ export function App() {
 
   const onMapChange = (index: number) => {
     setSelectedMap(index);
-    if (!engineReady) return;
+    if (!engine || !engineReady) return;
     engine.setMap(index);
     engine.setNames(names);
     engine.setWinnerRank(winnerRank, winnerType, names.length);
@@ -114,12 +123,7 @@ export function App() {
     if (!goalWinner || names.length === 0) return;
     try {
       setSyncStatus('saving...');
-      await drawApi.create({
-        participants: names,
-        winner: goalWinner,
-        winnerRank,
-        winnerType,
-      });
+      await drawApi.create({ participants: names, winner: goalWinner, winnerRank, winnerType });
       setSyncStatus('saved');
       await refreshRecords();
     } catch (err) {
@@ -130,7 +134,7 @@ export function App() {
   return (
     <main className="container">
       <h1>Roulette React Migration (Phase 3+)</h1>
-      <p className="desc">컴포넌트 분해 + 엔진 어댑터 + 백엔드 연동 스캐폴드 결합 단계입니다.</p>
+      <p className="desc">루트 화면도 React로 전환했고, Canvas는 React mount 노드 안에서 생성됩니다.</p>
 
       <EngineStatusCard engineReady={engineReady} />
       <ParticipantsCard namesInput={namesInput} namesCount={names.length} onChange={setNamesInput} />
@@ -143,7 +147,7 @@ export function App() {
         onWinnerRankInputChange={setWinnerRankInput}
         onSpeedChange={(next) => {
           setSpeed(next);
-          if (engineReady) engine.setSpeed(next);
+          if (engine && engineReady) engine.setSpeed(next);
         }}
         onAutoRecordingChange={setAutoRecording}
       />
@@ -164,6 +168,10 @@ export function App() {
         onStart={onStart}
         onReset={onReset}
       />
+      <section className="card">
+        <h2>Canvas Host (React mount)</h2>
+        <div ref={canvasHostRef} className="canvas-host" />
+      </section>
       <DataSyncCard
         apiBase={apiBase}
         status={syncStatus}

@@ -38,7 +38,7 @@
 - 이벤트/엔진 브릿지 정리
   - [x] `RouletteEngineAdapter` 도입 (엔진 접근 통로 일원화)
   - [x] goal 이벤트를 React 상태로 연결
-  - [ ] canvas mount 위치를 React DOM 노드로 이관
+  - [x] canvas mount 위치를 React DOM 노드로 이관
 - 추가 이관
   - [x] 맵 선택 / 테마 선택 / 자동녹화 옵션 React UI 반영
   - [ ] 기타 고급 옵션/패널 이관 완료

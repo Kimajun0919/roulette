@@ -13,28 +13,27 @@ This is a lucky draw by dropping marbles.
 
 ## Development
 
-### Legacy (현재 서비스 기준)
+### React (기본)
 ```shell
-> yarn
-> yarn dev
+> npm install
+> npm run dev
 ```
 
-### React migration shell (신규)
+### Legacy (비교/검증용)
 ```shell
-> yarn
-> yarn dev:react
+> npm run dev:legacy
 ```
 
 ## Build
 
-### Legacy
+### React (기본)
 ```shell
-> yarn build
+> npm run build
 ```
 
-### React migration shell
+### Legacy (비교/검증용)
 ```shell
-> yarn build:react
+> npm run build:legacy
 ```
 
 ## Migration note

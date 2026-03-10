@@ -32,9 +32,11 @@ export class RouletteRenderer {
   protected _images: { [key: string]: HTMLImageElement } = {};
   protected _theme: ColorTheme = Themes.dark;
   protected _keywordService: KeywordService;
+  protected _mountElement: HTMLElement;
 
-  constructor() {
+  constructor(mountElement?: HTMLElement) {
     this._keywordService = this.createKeywordService();
+    this._mountElement = mountElement ?? document.body;
   }
 
   protected createKeywordService(): KeywordService {
@@ -67,7 +69,7 @@ export class RouletteRenderer {
       alpha: false,
     }) as CanvasRenderingContext2D;
 
-    document.body.appendChild(this._canvas);
+    this._mountElement.appendChild(this._canvas);
 
     const resizing = (entries?: ResizeObserverEntry[]) => {
       const realSize = entries ? entries[0].contentRect : this._canvas.getBoundingClientRect();

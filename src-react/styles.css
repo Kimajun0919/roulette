@@ -17,3 +17,5 @@ input[type='checkbox'] { transform: scale(1.1); }
 .row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 label { font-size: 14px; color: #d1d5db; }
 .muted { color: #9ca3af; font-size: 14px; }
+.canvas-host { width: 100%; min-height: 420px; border: 1px dashed #4b5563; border-radius: 10px; overflow: hidden; background: #000; }
+.canvas-host canvas { display: block; width: 100%; height: auto; }

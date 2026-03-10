@@ -22,8 +22,11 @@
   },
   "scripts": {
     "lint": "biome check --fix src/",
-    "dev": "parcel index.html --port 1235",
-    "build": "parcel build index.html --public-url /roulette/ && node scripts/build-sw.js",
+    "dev": "vite --config vite.react.config.ts --port 1236",
+    "build": "vite build --config vite.react.config.ts",
+    "preview": "vite preview --config vite.react.config.ts --port 4174",
+    "dev:legacy": "./node_modules/.bin/parcel legacy.index.html --port 1235",
+    "build:legacy": "./node_modules/.bin/parcel build legacy.index.html --public-url /roulette/ && node scripts/build-sw.js",
     "dev:react": "vite --config vite.react.config.ts --port 1236",
     "build:react": "vite build --config vite.react.config.ts",
     "preview:react": "vite preview --config vite.react.config.ts --port 4174"
