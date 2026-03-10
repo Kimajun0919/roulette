@@ -1,5 +1,5 @@
 import { useMemo, useReducer, useState } from 'react';
-import { loadAttendanceWeights, type AttendanceWeight } from './api/haneulbit';
+import { loadAttendanceWeights } from './api/haneulbit';
 import { ApiModeCard } from './components/ApiModeCard';
 import { DrawOptionsCard } from './components/DrawOptionsCard';
 import { EngineStatusCard } from './components/EngineStatusCard';
@@ -7,99 +7,15 @@ import { MapThemeCard } from './components/MapThemeCard';
 import { NextStepsCard } from './components/NextStepsCard';
 import { ParticipantsCard } from './components/ParticipantsCard';
 import { RunCard } from './components/RunCard';
-import type { WinnerType } from './engine/RouletteEngineAdapter';
 import { useRouletteEngine } from './engine/useRouletteEngine';
-
-type UiState = {
-  namesInput: string;
-  winnerType: WinnerType;
-  winnerRankInput: number;
-  speed: number;
-  autoRecording: boolean;
-  useSkills: boolean;
-  selectedMap: number;
-  theme: string;
-  mode: 'local' | 'api';
-  apiBaseUrl: string;
-  apiToken: string;
-  apiStatus: string;
-  apiRole: string;
-  weights: AttendanceWeight[];
-};
-
-type UiAction =
-  | { type: 'setNamesInput'; value: string }
-  | { type: 'setWinnerType'; value: WinnerType }
-  | { type: 'setWinnerRankInput'; value: number }
-  | { type: 'setSpeed'; value: number }
-  | { type: 'setAutoRecording'; value: boolean }
-  | { type: 'setUseSkills'; value: boolean }
-  | { type: 'setSelectedMap'; value: number }
-  | { type: 'setTheme'; value: string }
-  | { type: 'setMode'; value: 'local' | 'api' }
-  | { type: 'setApiBaseUrl'; value: string }
-  | { type: 'setApiToken'; value: string }
-  | { type: 'setApiStatus'; value: string }
-  | { type: 'apiLoaded'; role: string; weights: AttendanceWeight[]; namesInput: string };
-
-function uiReducer(state: UiState, action: UiAction): UiState {
-  switch (action.type) {
-    case 'setNamesInput':
-      return { ...state, namesInput: action.value };
-    case 'setWinnerType':
-      return { ...state, winnerType: action.value };
-    case 'setWinnerRankInput':
-      return { ...state, winnerRankInput: action.value };
-    case 'setSpeed':
-      return { ...state, speed: action.value };
-    case 'setAutoRecording':
-      return { ...state, autoRecording: action.value };
-    case 'setUseSkills':
-      return { ...state, useSkills: action.value };
-    case 'setSelectedMap':
-      return { ...state, selectedMap: action.value };
-    case 'setTheme':
-      return { ...state, theme: action.value };
-    case 'setMode':
-      return { ...state, mode: action.value };
-    case 'setApiBaseUrl':
-      return { ...state, apiBaseUrl: action.value };
-    case 'setApiToken':
-      return { ...state, apiToken: action.value };
-    case 'setApiStatus':
-      return { ...state, apiStatus: action.value };
-    case 'apiLoaded':
-      return {
-        ...state,
-        apiRole: action.role,
-        weights: action.weights,
-        namesInput: action.namesInput,
-      };
-    default:
-      return state;
-  }
-}
-
-const initialState: UiState = {
-  namesInput: '',
-  winnerType: 'first',
-  winnerRankInput: 1,
-  speed: 1,
-  autoRecording: true,
-  useSkills: true,
-  selectedMap: 0,
-  theme: 'dark',
-  mode: 'local',
-  apiBaseUrl: (import.meta.env.VITE_API_BASE_URL as string | undefined) || 'https://haneulbit-api.holyimpact.org',
-  apiToken: '',
-  apiStatus: 'idle',
-  apiRole: '',
-  weights: [],
-};
+import { createInitialUiState, uiReducer } from './store/uiState';
 
 export function App() {
   const [canvasHostEl, setCanvasHostEl] = useState<HTMLDivElement | null>(null);
-  const [state, dispatch] = useReducer(uiReducer, initialState);
+  const [state, dispatch] = useReducer(
+    uiReducer,
+    createInitialUiState((import.meta.env.VITE_API_BASE_URL as string | undefined) || 'https://haneulbit-api.holyimpact.org')
+  );
 
   const names = useMemo(
     () => state.namesInput.split(/[\n,]/g).map((v) => v.trim()).filter(Boolean),
