@@ -1,15 +1,11 @@
 import '../src/localization';
-import options from '../src/options';
-import { registerServiceWorker } from '../src/registerServiceWorker';
-import { Roulette } from '../src/roulette';
+import { RouletteEngineAdapter } from './engine/RouletteEngineAdapter';
 
-let roulette: Roulette | null = null;
+let engine: RouletteEngineAdapter | null = null;
 
-export function startLegacyEngine() {
-  if (roulette) return roulette;
-  registerServiceWorker();
-  roulette = new Roulette();
-  (window as any).roulette = roulette;
-  (window as any).options = options;
-  return roulette;
+export function getEngine() {
+  if (!engine) {
+    engine = new RouletteEngineAdapter();
+  }
+  return engine;
 }

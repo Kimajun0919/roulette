@@ -1,16 +1,20 @@
 import { useEffect, useMemo, useState } from 'react';
-import { startLegacyEngine } from './legacyEngine';
-
-type WinnerType = 'first' | 'last' | 'custom';
+import { getEngine } from './legacyEngine';
+import type { WinnerType } from './engine/RouletteEngineAdapter';
 
 export function App() {
-  const [engine, setEngine] = useState<ReturnType<typeof startLegacyEngine> | null>(null);
+  const [engine] = useState(() => getEngine());
   const [engineReady, setEngineReady] = useState(false);
   const [namesInput, setNamesInput] = useState('');
   const [winnerType, setWinnerType] = useState<WinnerType>('first');
   const [winnerRankInput, setWinnerRankInput] = useState(1);
   const [speed, setSpeed] = useState(1);
   const [goalWinner, setGoalWinner] = useState<string | null>(null);
+  const [autoRecording, setAutoRecording] = useState(true);
+  const [maps, setMaps] = useState<Array<{ index: number; title: string }>>([]);
+  const [selectedMap, setSelectedMap] = useState(0);
+  const [themes, setThemes] = useState<string[]>([]);
+  const [theme, setTheme] = useState('dark');
 
   const names = useMemo(
     () => namesInput.split(/[\n,]/g).map((v) => v.trim()).filter(Boolean),
@@ -24,12 +28,11 @@ export function App() {
   }, [winnerRankInput, winnerType, names.length]);
 
   useEffect(() => {
-    const r = startLegacyEngine();
-    setEngine(r);
-
     const checkReady = () => {
-      if (r.isReady) {
+      if (engine.isReady) {
         setEngineReady(true);
+        setMaps(engine.getMaps());
+        setThemes(engine.getThemeNames());
         return true;
       }
       return false;
@@ -41,53 +44,63 @@ export function App() {
       }, 100);
       return () => window.clearInterval(timer);
     }
-  }, []);
-
-  useEffect(() => {
-    if (!engine) return;
-    const onGoal = (ev: Event) => {
-      const detail = (ev as CustomEvent<{ winner?: string }>).detail;
-      setGoalWinner(detail?.winner || null);
-    };
-    engine.addEventListener('goal', onGoal);
-    return () => engine.removeEventListener('goal', onGoal);
   }, [engine]);
 
+  useEffect(() => engine.onGoal((winner) => setGoalWinner(winner)), [engine]);
+
   useEffect(() => {
-    if (!engine || !engineReady) return;
-    engine.setMarbles(names);
-    engine.setWinningRank(Math.max(0, winnerRank - 1));
-  }, [engine, engineReady, names, winnerRank]);
+    if (!engineReady) return;
+    engine.setNames(names);
+    engine.setWinnerRank(winnerRank, winnerType, names.length);
+  }, [engine, engineReady, names, winnerRank, winnerType]);
+
+  useEffect(() => {
+    if (!engineReady) return;
+    engine.setAutoRecording(autoRecording);
+  }, [engine, engineReady, autoRecording]);
+
+  useEffect(() => {
+    if (!engineReady) return;
+    engine.setTheme(theme);
+  }, [engine, engineReady, theme]);
 
   const onStart = () => {
-    if (!engine || !engineReady) return;
+    if (!engineReady) return;
     setGoalWinner(null);
-    engine.setWinningRank(Math.max(0, winnerRank - 1));
+    engine.setWinnerRank(winnerRank, winnerType, names.length);
     engine.start();
   };
 
   const onReset = () => {
-    if (!engine || !engineReady) return;
+    if (!engineReady) return;
     setGoalWinner(null);
-    engine.setMarbles(names);
-    engine.setWinningRank(Math.max(0, winnerRank - 1));
+    engine.reset(names);
+    engine.setWinnerRank(winnerRank, winnerType, names.length);
   };
 
   const onSpeedChange = (next: number) => {
     setSpeed(next);
-    if (!engine || !engineReady) return;
+    if (!engineReady) return;
     engine.setSpeed(next);
+  };
+
+  const onMapChange = (index: number) => {
+    setSelectedMap(index);
+    if (!engineReady) return;
+    engine.setMap(index);
+    engine.setNames(names);
+    engine.setWinnerRank(winnerRank, winnerType, names.length);
   };
 
   return (
     <main className="container">
-      <h1>Roulette React Migration (Phase 2)</h1>
-      <p className="desc">레거시 엔진은 유지하고, 입력/옵션/실행 UI를 React 상태로 점진 이관 중입니다.</p>
+      <h1>Roulette React Migration (Phase 3)</h1>
+      <p className="desc">레거시 inline script 없이 React 상태 + 어댑터 기반으로 UI를 이관 중입니다.</p>
 
       <section className="card">
         <h2>엔진 상태</h2>
         <p>{engineReady ? '✅ 준비 완료' : '⏳ 초기화 중...'}</p>
-        <p className="muted">Canvas는 레거시 엔진이 body에 직접 생성합니다(공존 단계).</p>
+        <p className="muted">Canvas는 레거시 엔진이 body에 생성합니다(최종 단계에서 React mount로 이동 예정).</p>
       </section>
 
       <section className="card">
@@ -102,7 +115,7 @@ export function App() {
       </section>
 
       <section className="card">
-        <h2>당첨 옵션</h2>
+        <h2>추첨 옵션</h2>
         <div className="row">
           <button className={winnerType === 'first' ? 'active' : ''} onClick={() => setWinnerType('first')}>첫번째</button>
           <button className={winnerType === 'last' ? 'active' : ''} onClick={() => setWinnerType('last')}>마지막</button>
@@ -135,6 +148,51 @@ export function App() {
           />
           <span>{speed.toFixed(1)}x</span>
         </div>
+
+        <div className="row" style={{ marginTop: 10 }}>
+          <label htmlFor="auto-recording">자동 녹화</label>
+          <input
+            id="auto-recording"
+            type="checkbox"
+            checked={autoRecording}
+            onChange={(e) => setAutoRecording(e.target.checked)}
+          />
+        </div>
+      </section>
+
+      <section className="card">
+        <h2>맵/테마</h2>
+        <div className="row">
+          <label htmlFor="map-select">맵</label>
+          <select
+            id="map-select"
+            value={selectedMap}
+            onChange={(e) => onMapChange(Number(e.target.value))}
+            disabled={!engineReady}
+          >
+            {maps.map((m) => (
+              <option key={m.index} value={m.index}>
+                {m.index + 1}. {m.title}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div className="row" style={{ marginTop: 10 }}>
+          <label htmlFor="theme-select">테마</label>
+          <select
+            id="theme-select"
+            value={theme}
+            onChange={(e) => setTheme(e.target.value)}
+            disabled={!engineReady}
+          >
+            {themes.map((name) => (
+              <option key={name} value={name}>
+                {name}
+              </option>
+            ))}
+          </select>
+        </div>
       </section>
 
       <section className="card">
@@ -150,9 +208,9 @@ export function App() {
       <section className="card">
         <h2>다음 단계</h2>
         <ul>
-          <li>inline script 이벤트/DOM 제어를 React 컴포넌트로 완전 이관</li>
-          <li>백엔드 추첨 데이터 API 연동 레이어 추가</li>
-          <li>Figma MCP 연동 가능한 컴포넌트 구조로 재배치</li>
+          <li>추첨 데이터 백엔드 연동 (`src-react/api`) + 저장/조회 UI</li>
+          <li>Figma MCP 연결 대비 컴포넌트 분해 (Panel, Form, ResultCard)</li>
+          <li>엔진 canvas를 React mount 노드로 이동해 완전 분리</li>
         </ul>
       </section>
     </main>

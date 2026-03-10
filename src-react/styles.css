@@ -11,8 +11,9 @@ button { background: #3b82f6; border: none; color: white; padding: 10px 14px; bo
 button:hover { background: #2563eb; }
 button.active { background: #8b5cf6; }
 button:disabled { opacity: 0.5; cursor: not-allowed; }
-textarea, input[type='number'] { width: 100%; border: 1px solid #4b5563; background: #111827; color: #f9fafb; border-radius: 8px; padding: 10px; }
+textarea, input[type='number'], select { width: 100%; border: 1px solid #4b5563; background: #111827; color: #f9fafb; border-radius: 8px; padding: 10px; }
 input[type='range'] { width: 220px; }
+input[type='checkbox'] { transform: scale(1.1); }
 .row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 label { font-size: 14px; color: #d1d5db; }
 .muted { color: #9ca3af; font-size: 14px; }

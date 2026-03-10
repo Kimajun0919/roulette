@@ -31,20 +31,26 @@
 
 ---
 
-## Phase 3
+## Phase 3 (진행중)
 - 상태 관리 구조화
-  - `useReducer` or Zustand로 마이그레이션
-  - 참가자 목록, 설정값, 실행상태를 단일 스토어로 통합
-- 이벤트 브릿지 정리
-  - `goal`, `message` 이벤트를 React-friendly hook으로 래핑
+  - [x] React 상태 기반으로 핵심 실행 플로우 유지
+  - [ ] `useReducer` or Zustand로 단일 스토어 통합
+- 이벤트/엔진 브릿지 정리
+  - [x] `RouletteEngineAdapter` 도입 (엔진 접근 통로 일원화)
+  - [x] goal 이벤트를 React 상태로 연결
+  - [ ] canvas mount 위치를 React DOM 노드로 이관
+- 추가 이관
+  - [x] 맵 선택 / 테마 선택 / 자동녹화 옵션 React UI 반영
+  - [ ] 기타 고급 옵션/패널 이관 완료
 
 ---
 
-## Phase 4
+## Phase 4 (준비 시작)
 - 백엔드 연동 계층 추가
-  - `src-react/api/*`에 API 클라이언트 구성
-  - 추첨 데이터 저장/조회/이력 API 연결
+  - [x] `src-react/api/*` API 클라이언트 스캐폴드 생성
+  - [ ] 추첨 데이터 저장/조회/이력 API 실제 연결
 - 실패/재시도/로딩 상태 표준화
+  - [ ] 에러/로딩 핸들링 공통 유틸 적용
 
 ---
 
