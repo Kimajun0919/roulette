@@ -2,9 +2,10 @@ type Props = {
   namesInput: string;
   namesCount: number;
   onChange: (value: string) => void;
+  onShuffle: () => void;
 };
 
-export function ParticipantsCard({ namesInput, namesCount, onChange }: Props) {
+export function ParticipantsCard({ namesInput, namesCount, onChange, onShuffle }: Props) {
   return (
     <section className="card">
       <h2>참가자 입력</h2>
@@ -14,6 +15,9 @@ export function ParticipantsCard({ namesInput, namesCount, onChange }: Props) {
         value={namesInput}
         onChange={(e) => onChange(e.target.value)}
       />
+      <div className="row" style={{ marginTop: 10 }}>
+        <button onClick={onShuffle} disabled={namesCount < 2}>순서 셔플</button>
+      </div>
       <p className="muted">현재 인원: {namesCount}명</p>
     </section>
   );

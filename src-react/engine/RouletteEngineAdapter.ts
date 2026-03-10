@@ -26,6 +26,15 @@ export class RouletteEngineAdapter {
     return () => this.roulette.removeEventListener('goal', handler);
   }
 
+  onMessage(callback: (message: string) => void) {
+    const handler = (ev: Event) => {
+      const detail = (ev as CustomEvent<string>).detail;
+      callback(detail);
+    };
+    this.roulette.addEventListener('message', handler);
+    return () => this.roulette.removeEventListener('message', handler);
+  }
+
   setNames(names: string[]) {
     this.roulette.setMarbles(names);
   }
@@ -48,6 +57,10 @@ export class RouletteEngineAdapter {
   setAutoRecording(enabled: boolean) {
     options.autoRecording = enabled;
     this.roulette.setAutoRecording(enabled);
+  }
+
+  setUseSkills(enabled: boolean) {
+    options.useSkills = enabled;
   }
 
   start() {

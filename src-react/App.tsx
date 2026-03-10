@@ -22,6 +22,8 @@ export function App() {
   const [speed, setSpeed] = useState(1);
   const [goalWinner, setGoalWinner] = useState<string | null>(null);
   const [autoRecording, setAutoRecording] = useState(true);
+  const [useSkills, setUseSkills] = useState(true);
+  const [lastMessage, setLastMessage] = useState<string | null>(null);
   const [maps, setMaps] = useState<Array<{ index: number; title: string }>>([]);
   const [selectedMap, setSelectedMap] = useState(0);
   const [themes, setThemes] = useState<string[]>([]);
@@ -67,7 +69,12 @@ export function App() {
 
   useEffect(() => {
     if (!engine) return;
-    return engine.onGoal((winner) => setGoalWinner(winner));
+    const offGoal = engine.onGoal((winner) => setGoalWinner(winner));
+    const offMessage = engine.onMessage((msg) => setLastMessage(msg));
+    return () => {
+      offGoal();
+      offMessage();
+    };
   }, [engine]);
 
   useEffect(() => {
@@ -85,6 +92,11 @@ export function App() {
     if (!engine || !engineReady) return;
     engine.setTheme(theme);
   }, [engine, engineReady, theme]);
+
+  useEffect(() => {
+    if (!engine || !engineReady) return;
+    engine.setUseSkills(useSkills);
+  }, [engine, engineReady, useSkills]);
 
   const onStart = () => {
     if (!engine || !engineReady) return;
@@ -137,12 +149,21 @@ export function App() {
       <p className="desc">루트 화면도 React로 전환했고, Canvas는 React mount 노드 안에서 생성됩니다.</p>
 
       <EngineStatusCard engineReady={engineReady} />
-      <ParticipantsCard namesInput={namesInput} namesCount={names.length} onChange={setNamesInput} />
+      <ParticipantsCard
+        namesInput={namesInput}
+        namesCount={names.length}
+        onChange={setNamesInput}
+        onShuffle={() => {
+          const shuffled = [...names].sort(() => Math.random() - 0.5);
+          setNamesInput(shuffled.join('\n'));
+        }}
+      />
       <DrawOptionsCard
         winnerType={winnerType}
         winnerRankInput={winnerRankInput}
         speed={speed}
         autoRecording={autoRecording}
+        useSkills={useSkills}
         onWinnerTypeChange={setWinnerType}
         onWinnerRankInputChange={setWinnerRankInput}
         onSpeedChange={(next) => {
@@ -150,6 +171,7 @@ export function App() {
           if (engine && engineReady) engine.setSpeed(next);
         }}
         onAutoRecordingChange={setAutoRecording}
+        onUseSkillsChange={setUseSkills}
       />
       <MapThemeCard
         engineReady={engineReady}
@@ -168,6 +190,10 @@ export function App() {
         onStart={onStart}
         onReset={onReset}
       />
+      <section className="card">
+        <h2>엔진 메시지</h2>
+        <p className="muted">{lastMessage ?? '아직 메시지 없음'}</p>
+      </section>
       <section className="card">
         <h2>Canvas Host (React mount)</h2>
         <div ref={canvasHostRef} className="canvas-host" />

@@ -5,10 +5,12 @@ type Props = {
   winnerRankInput: number;
   speed: number;
   autoRecording: boolean;
+  useSkills: boolean;
   onWinnerTypeChange: (value: WinnerType) => void;
   onWinnerRankInputChange: (value: number) => void;
   onSpeedChange: (value: number) => void;
   onAutoRecordingChange: (value: boolean) => void;
+  onUseSkillsChange: (value: boolean) => void;
 };
 
 export function DrawOptionsCard(props: Props) {
@@ -17,10 +19,12 @@ export function DrawOptionsCard(props: Props) {
     winnerRankInput,
     speed,
     autoRecording,
+    useSkills,
     onWinnerTypeChange,
     onWinnerRankInputChange,
     onSpeedChange,
     onAutoRecordingChange,
+    onUseSkillsChange,
   } = props;
 
   return (
@@ -66,6 +70,16 @@ export function DrawOptionsCard(props: Props) {
           type="checkbox"
           checked={autoRecording}
           onChange={(e) => onAutoRecordingChange(e.target.checked)}
+        />
+      </div>
+
+      <div className="row" style={{ marginTop: 10 }}>
+        <label htmlFor="use-skills">스킬 사용</label>
+        <input
+          id="use-skills"
+          type="checkbox"
+          checked={useSkills}
+          onChange={(e) => onUseSkillsChange(e.target.checked)}
         />
       </div>
     </section>
