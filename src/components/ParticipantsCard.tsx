@@ -16,7 +16,9 @@ export function ParticipantsCard({ namesInput, namesCount, onChange, onShuffle }
         onChange={(e) => onChange(e.target.value)}
       />
       <div className="row" style={{ marginTop: 10 }}>
-        <button onClick={onShuffle} disabled={namesCount < 2}>순서 셔플</button>
+        <button type="button" onClick={onShuffle} disabled={namesCount < 2}>
+          순서 셔플
+        </button>
       </div>
       <p className="muted">현재 인원: {namesCount}명</p>
     </section>

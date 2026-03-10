@@ -31,9 +31,27 @@ export function DrawOptionsCard(props: Props) {
     <section className="card">
       <h2>추첨 옵션</h2>
       <div className="row">
-        <button className={winnerType === 'first' ? 'active' : ''} onClick={() => onWinnerTypeChange('first')}>첫번째</button>
-        <button className={winnerType === 'last' ? 'active' : ''} onClick={() => onWinnerTypeChange('last')}>마지막</button>
-        <button className={winnerType === 'custom' ? 'active' : ''} onClick={() => onWinnerTypeChange('custom')}>직접입력</button>
+        <button
+          type="button"
+          className={winnerType === 'first' ? 'active' : ''}
+          onClick={() => onWinnerTypeChange('first')}
+        >
+          첫번째
+        </button>
+        <button
+          type="button"
+          className={winnerType === 'last' ? 'active' : ''}
+          onClick={() => onWinnerTypeChange('last')}
+        >
+          마지막
+        </button>
+        <button
+          type="button"
+          className={winnerType === 'custom' ? 'active' : ''}
+          onClick={() => onWinnerTypeChange('custom')}
+        >
+          직접입력
+        </button>
       </div>
 
       {winnerType === 'custom' && (

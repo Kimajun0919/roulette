@@ -16,7 +16,12 @@ export function MapThemeCard({ engineReady, maps, selectedMap, onMapChange, them
       <h2>맵/테마</h2>
       <div className="row">
         <label htmlFor="map-select">맵</label>
-        <select id="map-select" value={selectedMap} onChange={(e) => onMapChange(Number(e.target.value))} disabled={!engineReady}>
+        <select
+          id="map-select"
+          value={selectedMap}
+          onChange={(e) => onMapChange(Number(e.target.value))}
+          disabled={!engineReady}
+        >
           {maps.map((m) => (
             <option key={m.index} value={m.index}>
               {m.index + 1}. {m.title}

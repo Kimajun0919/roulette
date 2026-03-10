@@ -23,10 +23,10 @@ export function RunCard({
     <section className="card">
       <h2>실행</h2>
       <div className="row">
-        <button onClick={onStart} disabled={!engineReady || namesCount === 0}>
+        <button type="button" onClick={onStart} disabled={!engineReady || namesCount === 0}>
           추첨 시작
         </button>
-        <button onClick={onReset} disabled={!engineReady}>
+        <button type="button" onClick={onReset} disabled={!engineReady}>
           리셋
         </button>
         <button
