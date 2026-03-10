@@ -1,4 +1,3 @@
-import { registerServiceWorker } from '../engine-core/registerServiceWorker';
 import { Marble } from '../engine-core/marble';
 import { Roulette } from '../engine-core/roulette';
 import { Themes } from '../engine-core/data/constants';
@@ -9,7 +8,6 @@ export class RouletteEngineAdapter {
   private roulette: Roulette;
 
   constructor(mountElement?: HTMLElement) {
-    registerServiceWorker();
     this.roulette = new Roulette({ mountElement });
   }
 
