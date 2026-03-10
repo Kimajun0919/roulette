@@ -19,12 +19,15 @@
 
 ---
 
-## Phase 2 (다음)
+## Phase 2 (진행중)
 - `index.html`의 inline script 로직을 React 컴포넌트로 분리
-  - 입력 패널
-  - 당첨 순위/옵션 패널
-  - 실행/결과 패널
+  - [x] 입력 패널(이름 입력)
+  - [x] 당첨 순위/옵션 패널(첫번째/마지막/직접입력, 속도)
+  - [x] 실행/결과 패널(시작/리셋, goal 이벤트 표시)
+  - [ ] 나머지 옵션/맵/고급 기능 패널 이관
 - 기존 `window.roulette/window.options` 의존 제거
+  - [x] React 어댑터(`legacyEngine`)로 직접 접근 통로 통일
+  - [ ] 전역 window 의존 완전 제거
 
 ---
 
