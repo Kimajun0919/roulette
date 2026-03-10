@@ -1,5 +1,4 @@
-import { useMemo, useReducer, useState } from 'react';
-import { loadAttendanceWeights } from './api/haneulbit';
+import { useState } from 'react';
 import { ApiModeCard } from './components/ApiModeCard';
 import { DrawOptionsCard } from './components/DrawOptionsCard';
 import { EngineStatusCard } from './components/EngineStatusCard';
@@ -8,25 +7,11 @@ import { NextStepsCard } from './components/NextStepsCard';
 import { ParticipantsCard } from './components/ParticipantsCard';
 import { RunCard } from './components/RunCard';
 import { useRouletteEngine } from './engine/useRouletteEngine';
-import { createInitialUiState, uiReducer } from './store/uiState';
+import { useRouletteUi } from './store/useRouletteUi';
 
 export function App() {
   const [canvasHostEl, setCanvasHostEl] = useState<HTMLDivElement | null>(null);
-  const [state, dispatch] = useReducer(
-    uiReducer,
-    createInitialUiState((import.meta.env.VITE_API_BASE_URL as string | undefined) || 'https://haneulbit-api.holyimpact.org')
-  );
-
-  const names = useMemo(
-    () => state.namesInput.split(/[\n,]/g).map((v) => v.trim()).filter(Boolean),
-    [state.namesInput]
-  );
-
-  const winnerRank = useMemo(() => {
-    if (state.winnerType === 'first') return 1;
-    if (state.winnerType === 'last') return Math.max(1, names.length);
-    return Math.max(1, state.winnerRankInput);
-  }, [state.winnerRankInput, state.winnerType, names.length]);
+  const { state, dispatch, names, winnerRank, shuffleNames, loadFromAttendanceApi } = useRouletteUi();
 
   const {
     engineReady,
@@ -53,23 +38,6 @@ export function App() {
     setMap(index);
   };
 
-  const loadFromAttendanceApi = async () => {
-    try {
-      dispatch({ type: 'setApiStatus', value: 'loading...' });
-      const { me, weights } = await loadAttendanceWeights(state.apiBaseUrl, state.apiToken.trim());
-      const weightedNames = weights.map((w) => `${w.name}*${Math.max(1, w.count)}`);
-      dispatch({
-        type: 'apiLoaded',
-        role: me.role || 'unknown',
-        weights,
-        namesInput: weightedNames.join('\n'),
-      });
-      dispatch({ type: 'setApiStatus', value: `loaded ${weights.length} users (approved attendance based weights)` });
-    } catch (err) {
-      dispatch({ type: 'setApiStatus', value: `failed: ${err instanceof Error ? err.message : String(err)}` });
-    }
-  };
-
   return (
     <main className="container">
       <h1>Roulette React Migration (Phase 3+)</h1>
@@ -92,10 +60,7 @@ export function App() {
         namesInput={state.namesInput}
         namesCount={names.length}
         onChange={(v) => dispatch({ type: 'setNamesInput', value: v })}
-        onShuffle={() => {
-          const shuffled = [...names].sort(() => Math.random() - 0.5);
-          dispatch({ type: 'setNamesInput', value: shuffled.join('\n') });
-        }}
+        onShuffle={shuffleNames}
       />
       <DrawOptionsCard
         winnerType={state.winnerType}
