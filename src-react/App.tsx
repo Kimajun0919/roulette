@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useReducer, useState } from 'react';
 import { loadAttendanceWeights, type AttendanceWeight } from './api/haneulbit';
 import { ApiModeCard } from './components/ApiModeCard';
 import { DrawOptionsCard } from './components/DrawOptionsCard';
@@ -10,32 +10,107 @@ import { RunCard } from './components/RunCard';
 import type { WinnerType } from './engine/RouletteEngineAdapter';
 import { useRouletteEngine } from './engine/useRouletteEngine';
 
+type UiState = {
+  namesInput: string;
+  winnerType: WinnerType;
+  winnerRankInput: number;
+  speed: number;
+  autoRecording: boolean;
+  useSkills: boolean;
+  selectedMap: number;
+  theme: string;
+  mode: 'local' | 'api';
+  apiBaseUrl: string;
+  apiToken: string;
+  apiStatus: string;
+  apiRole: string;
+  weights: AttendanceWeight[];
+};
+
+type UiAction =
+  | { type: 'setNamesInput'; value: string }
+  | { type: 'setWinnerType'; value: WinnerType }
+  | { type: 'setWinnerRankInput'; value: number }
+  | { type: 'setSpeed'; value: number }
+  | { type: 'setAutoRecording'; value: boolean }
+  | { type: 'setUseSkills'; value: boolean }
+  | { type: 'setSelectedMap'; value: number }
+  | { type: 'setTheme'; value: string }
+  | { type: 'setMode'; value: 'local' | 'api' }
+  | { type: 'setApiBaseUrl'; value: string }
+  | { type: 'setApiToken'; value: string }
+  | { type: 'setApiStatus'; value: string }
+  | { type: 'apiLoaded'; role: string; weights: AttendanceWeight[]; namesInput: string };
+
+function uiReducer(state: UiState, action: UiAction): UiState {
+  switch (action.type) {
+    case 'setNamesInput':
+      return { ...state, namesInput: action.value };
+    case 'setWinnerType':
+      return { ...state, winnerType: action.value };
+    case 'setWinnerRankInput':
+      return { ...state, winnerRankInput: action.value };
+    case 'setSpeed':
+      return { ...state, speed: action.value };
+    case 'setAutoRecording':
+      return { ...state, autoRecording: action.value };
+    case 'setUseSkills':
+      return { ...state, useSkills: action.value };
+    case 'setSelectedMap':
+      return { ...state, selectedMap: action.value };
+    case 'setTheme':
+      return { ...state, theme: action.value };
+    case 'setMode':
+      return { ...state, mode: action.value };
+    case 'setApiBaseUrl':
+      return { ...state, apiBaseUrl: action.value };
+    case 'setApiToken':
+      return { ...state, apiToken: action.value };
+    case 'setApiStatus':
+      return { ...state, apiStatus: action.value };
+    case 'apiLoaded':
+      return {
+        ...state,
+        apiRole: action.role,
+        weights: action.weights,
+        namesInput: action.namesInput,
+      };
+    default:
+      return state;
+  }
+}
+
+const initialState: UiState = {
+  namesInput: '',
+  winnerType: 'first',
+  winnerRankInput: 1,
+  speed: 1,
+  autoRecording: true,
+  useSkills: true,
+  selectedMap: 0,
+  theme: 'dark',
+  mode: 'local',
+  apiBaseUrl: (import.meta.env.VITE_API_BASE_URL as string | undefined) || 'https://haneulbit-api.holyimpact.org',
+  apiToken: '',
+  apiStatus: 'idle',
+  apiRole: '',
+  weights: [],
+};
+
 export function App() {
   const [canvasHostEl, setCanvasHostEl] = useState<HTMLDivElement | null>(null);
-  const [namesInput, setNamesInput] = useState('');
-  const [winnerType, setWinnerType] = useState<WinnerType>('first');
-  const [winnerRankInput, setWinnerRankInput] = useState(1);
-  const [speed, setSpeed] = useState(1);
-  const [autoRecording, setAutoRecording] = useState(true);
-  const [useSkills, setUseSkills] = useState(true);
-  const [selectedMap, setSelectedMap] = useState(0);
-  const [theme, setTheme] = useState('dark');
-  const [mode, setMode] = useState<'local' | 'api'>('local');
-  const [apiBaseUrl, setApiBaseUrl] = useState(
-    (import.meta.env.VITE_API_BASE_URL as string | undefined) || 'https://haneulbit-api.holyimpact.org'
-  );
-  const [apiToken, setApiToken] = useState('');
-  const [apiStatus, setApiStatus] = useState('idle');
-  const [apiRole, setApiRole] = useState('');
-  const [weights, setWeights] = useState<AttendanceWeight[]>([]);
+  const [state, dispatch] = useReducer(uiReducer, initialState);
 
-  const names = useMemo(() => namesInput.split(/[\n,]/g).map((v) => v.trim()).filter(Boolean), [namesInput]);
+  const names = useMemo(
+    () => state.namesInput.split(/[\n,]/g).map((v) => v.trim()).filter(Boolean),
+    [state.namesInput]
+  );
 
   const winnerRank = useMemo(() => {
-    if (winnerType === 'first') return 1;
-    if (winnerType === 'last') return Math.max(1, names.length);
-    return Math.max(1, winnerRankInput);
-  }, [winnerRankInput, winnerType, names.length]);
+    if (state.winnerType === 'first') return 1;
+    if (state.winnerType === 'last') return Math.max(1, names.length);
+    return Math.max(1, state.winnerRankInput);
+  }, [state.winnerRankInput, state.winnerType, names.length]);
 
   const {
     engineReady,
@@ -50,29 +125,32 @@ export function App() {
     mountElement: canvasHostEl,
     names,
     winnerRank,
-    winnerType,
-    speed,
-    autoRecording,
-    useSkills,
-    theme,
+    winnerType: state.winnerType,
+    speed: state.speed,
+    autoRecording: state.autoRecording,
+    useSkills: state.useSkills,
+    theme: state.theme,
   });
 
   const onMapChange = (index: number) => {
-    setSelectedMap(index);
+    dispatch({ type: 'setSelectedMap', value: index });
     setMap(index);
   };
 
   const loadFromAttendanceApi = async () => {
     try {
-      setApiStatus('loading...');
-      const { me, weights } = await loadAttendanceWeights(apiBaseUrl, apiToken.trim());
-      setApiRole(me.role || 'unknown');
-      setWeights(weights);
+      dispatch({ type: 'setApiStatus', value: 'loading...' });
+      const { me, weights } = await loadAttendanceWeights(state.apiBaseUrl, state.apiToken.trim());
       const weightedNames = weights.map((w) => `${w.name}*${Math.max(1, w.count)}`);
-      setNamesInput(weightedNames.join('\n'));
-      setApiStatus(`loaded ${weights.length} users (approved attendance based weights)`);
+      dispatch({
+        type: 'apiLoaded',
+        role: me.role || 'unknown',
+        weights,
+        namesInput: weightedNames.join('\n'),
+      });
+      dispatch({ type: 'setApiStatus', value: `loaded ${weights.length} users (approved attendance based weights)` });
     } catch (err) {
-      setApiStatus(`failed: ${err instanceof Error ? err.message : String(err)}`);
+      dispatch({ type: 'setApiStatus', value: `failed: ${err instanceof Error ? err.message : String(err)}` });
     }
   };
 
@@ -83,46 +161,46 @@ export function App() {
 
       <EngineStatusCard engineReady={engineReady} />
       <ApiModeCard
-        mode={mode}
-        onModeChange={setMode}
-        apiBaseUrl={apiBaseUrl}
-        apiToken={apiToken}
-        apiStatus={apiStatus}
-        apiRole={apiRole}
-        weights={weights}
-        onApiBaseUrlChange={setApiBaseUrl}
-        onApiTokenChange={setApiToken}
+        mode={state.mode}
+        onModeChange={(v) => dispatch({ type: 'setMode', value: v })}
+        apiBaseUrl={state.apiBaseUrl}
+        apiToken={state.apiToken}
+        apiStatus={state.apiStatus}
+        apiRole={state.apiRole}
+        weights={state.weights}
+        onApiBaseUrlChange={(v) => dispatch({ type: 'setApiBaseUrl', value: v })}
+        onApiTokenChange={(v) => dispatch({ type: 'setApiToken', value: v })}
         onLoadAttendance={loadFromAttendanceApi}
       />
       <ParticipantsCard
-        namesInput={namesInput}
+        namesInput={state.namesInput}
         namesCount={names.length}
-        onChange={setNamesInput}
+        onChange={(v) => dispatch({ type: 'setNamesInput', value: v })}
         onShuffle={() => {
           const shuffled = [...names].sort(() => Math.random() - 0.5);
-          setNamesInput(shuffled.join('\n'));
+          dispatch({ type: 'setNamesInput', value: shuffled.join('\n') });
         }}
       />
       <DrawOptionsCard
-        winnerType={winnerType}
-        winnerRankInput={winnerRankInput}
-        speed={speed}
-        autoRecording={autoRecording}
-        useSkills={useSkills}
-        onWinnerTypeChange={setWinnerType}
-        onWinnerRankInputChange={setWinnerRankInput}
-        onSpeedChange={setSpeed}
-        onAutoRecordingChange={setAutoRecording}
-        onUseSkillsChange={setUseSkills}
+        winnerType={state.winnerType}
+        winnerRankInput={state.winnerRankInput}
+        speed={state.speed}
+        autoRecording={state.autoRecording}
+        useSkills={state.useSkills}
+        onWinnerTypeChange={(v) => dispatch({ type: 'setWinnerType', value: v })}
+        onWinnerRankInputChange={(v) => dispatch({ type: 'setWinnerRankInput', value: v })}
+        onSpeedChange={(v) => dispatch({ type: 'setSpeed', value: v })}
+        onAutoRecordingChange={(v) => dispatch({ type: 'setAutoRecording', value: v })}
+        onUseSkillsChange={(v) => dispatch({ type: 'setUseSkills', value: v })}
       />
       <MapThemeCard
         engineReady={engineReady}
         maps={maps}
-        selectedMap={selectedMap}
+        selectedMap={state.selectedMap}
         onMapChange={onMapChange}
         themes={themes}
-        theme={theme}
-        onThemeChange={setTheme}
+        theme={state.theme}
+        onThemeChange={(v) => dispatch({ type: 'setTheme', value: v })}
       />
       <RunCard
         engineReady={engineReady}
@@ -140,7 +218,6 @@ export function App() {
         <h2>Canvas Host (React mount)</h2>
         <div ref={setCanvasHostEl} className="canvas-host" />
       </section>
-      {/* data sync card removed: replaced by API mode card */}
       <NextStepsCard />
     </main>
   );
