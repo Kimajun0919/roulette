@@ -32,7 +32,10 @@ async function apiFetch<T>(baseUrl: string, path: string, token: string): Promis
   return response.json() as Promise<T>;
 }
 
-export async function loadAttendanceWeights(baseUrl: string, token: string): Promise<{
+export async function loadAttendanceWeights(
+  baseUrl: string,
+  token: string
+): Promise<{
   me: HaneulbitUser;
   weights: AttendanceWeight[];
 }> {

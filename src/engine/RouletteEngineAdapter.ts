@@ -1,16 +1,21 @@
+import { Themes } from '../engine-core/data/constants';
 import { Marble } from '../engine-core/marble';
 import { Roulette } from '../engine-core/roulette';
-import { Themes } from '../engine-core/data/constants';
 import type { RecordingReadyDetail } from '../engine-core/utils/videoRecorder';
 
 export type WinnerType = 'first' | 'last' | 'custom';
 export type RecordingResult = RecordingReadyDetail;
 
+type RouletteEngineAdapterOptions = {
+  mountElement?: HTMLElement;
+  canvasElement?: HTMLCanvasElement;
+};
+
 export class RouletteEngineAdapter {
   private roulette: Roulette;
 
-  constructor(mountElement?: HTMLElement) {
-    this.roulette = new Roulette({ mountElement });
+  constructor(options?: RouletteEngineAdapterOptions) {
+    this.roulette = new Roulette(options);
   }
 
   get isReady() {
@@ -58,11 +63,7 @@ export class RouletteEngineAdapter {
 
   setWinnerRank(rankOneBased: number, winnerType: WinnerType, totalCount: number) {
     const rankZeroBased =
-      winnerType === 'first'
-        ? 0
-        : winnerType === 'last'
-          ? Math.max(0, totalCount - 1)
-          : Math.max(0, rankOneBased - 1);
+      winnerType === 'first' ? 0 : winnerType === 'last' ? Math.max(0, totalCount - 1) : Math.max(0, rankOneBased - 1);
     this.roulette.setWinningRank(rankZeroBased);
   }
 

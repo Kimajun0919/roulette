@@ -5,41 +5,40 @@ type Props = {
   maps: MapOption[];
   selectedMap: number;
   onMapChange: (index: number) => void;
-  themes: string[];
   theme: string;
   onThemeChange: (theme: string) => void;
 };
 
-export function MapThemeCard({ engineReady, maps, selectedMap, onMapChange, themes, theme, onThemeChange }: Props) {
+export function MapThemeCard({ engineReady, maps, selectedMap, onMapChange, theme, onThemeChange }: Props) {
   return (
-    <section className="card">
-      <h2>맵/테마</h2>
+    <>
       <div className="row">
-        <label htmlFor="map-select">맵</label>
-        <select
-          id="map-select"
-          value={selectedMap}
-          onChange={(e) => onMapChange(Number(e.target.value))}
-          disabled={!engineReady}
-        >
+        <label htmlFor="sltMap">
+          <i className="icon map" />
+          <span>Map</span>
+        </label>
+        <select id="sltMap" value={selectedMap} onChange={(e) => onMapChange(Number(e.target.value))} disabled={!engineReady}>
           {maps.map((m) => (
             <option key={m.index} value={m.index}>
-              {m.index + 1}. {m.title}
+              {m.title}
             </option>
           ))}
         </select>
       </div>
 
-      <div className="row" style={{ marginTop: 10 }}>
-        <label htmlFor="theme-select">테마</label>
-        <select id="theme-select" value={theme} onChange={(e) => onThemeChange(e.target.value)} disabled={!engineReady}>
-          {themes.map((name) => (
-            <option key={name} value={name}>
-              {name}
-            </option>
-          ))}
-        </select>
+      <div className="row row-theme">
+        <div className="theme">
+          <i className="icon sun" />
+          <input
+            type="checkbox"
+            id="chkDarkMode"
+            checked={theme === 'dark'}
+            disabled={!engineReady}
+            onChange={(e) => onThemeChange(e.target.checked ? 'dark' : 'light')}
+          />
+          <i className="icon moon" />
+        </div>
       </div>
-    </section>
+    </>
   );
 }

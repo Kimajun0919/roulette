@@ -28,78 +28,62 @@ export function DrawOptionsCard(props: Props) {
   } = props;
 
   return (
-    <section className="card">
-      <h2>추첨 옵션</h2>
-      <div className="row">
-        <button
-          type="button"
-          className={winnerType === 'first' ? 'active' : ''}
-          onClick={() => onWinnerTypeChange('first')}
-        >
-          첫번째
-        </button>
-        <button
-          type="button"
-          className={winnerType === 'last' ? 'active' : ''}
-          onClick={() => onWinnerTypeChange('last')}
-        >
-          마지막
-        </button>
-        <button
-          type="button"
-          className={winnerType === 'custom' ? 'active' : ''}
-          onClick={() => onWinnerTypeChange('custom')}
-        >
-          직접입력
-        </button>
+    <>
+      <div className="row row-toggles">
+        <div className="toggle-item">
+          <label htmlFor="chkAutoRecording">
+            <i className="icon record" />
+            <span>Recording</span>
+          </label>
+          <input
+            id="chkAutoRecording"
+            type="checkbox"
+            checked={autoRecording}
+            onChange={(e) => onAutoRecordingChange(e.target.checked)}
+          />
+        </div>
+        <div className="toggle-item">
+          <label htmlFor="chkSkill">
+            <i className="icon bomb" />
+            <span>Using skills</span>
+          </label>
+          <input id="chkSkill" type="checkbox" checked={useSkills} onChange={(e) => onUseSkillsChange(e.target.checked)} />
+        </div>
       </div>
 
-      {winnerType === 'custom' && (
-        <div className="row" style={{ marginTop: 10 }}>
-          <label htmlFor="winner-rank">당첨 순위</label>
+      <div className="row">
+        <label>
+          <i className="icon trophy" />
+          <span>The winner is</span>
+        </label>
+        <div className="btn-group">
+          <button type="button" className={winnerType === 'first' ? 'active' : ''} onClick={() => onWinnerTypeChange('first')}>
+            First
+          </button>
+          <button type="button" className={winnerType === 'last' ? 'active' : ''} onClick={() => onWinnerTypeChange('last')}>
+            Last
+          </button>
           <input
-            id="winner-rank"
+            id="in_winningRank"
             type="number"
             min={1}
             value={winnerRankInput}
+            className={winnerType === 'custom' ? 'active' : ''}
             onChange={(e) => onWinnerRankInputChange(Number(e.target.value || 1))}
+            onFocus={() => onWinnerTypeChange('custom')}
           />
         </div>
-      )}
-
-      <div className="row" style={{ marginTop: 10 }}>
-        <label htmlFor="speed">속도</label>
-        <input
-          id="speed"
-          type="range"
-          min={0.5}
-          max={3}
-          step={0.1}
-          value={speed}
-          onChange={(e) => onSpeedChange(Number(e.target.value))}
-        />
-        <span>{speed.toFixed(1)}x</span>
       </div>
 
-      <div className="row" style={{ marginTop: 10 }}>
-        <label htmlFor="auto-recording">자동 녹화</label>
-        <input
-          id="auto-recording"
-          type="checkbox"
-          checked={autoRecording}
-          onChange={(e) => onAutoRecordingChange(e.target.checked)}
-        />
+      <div className="row">
+        <label htmlFor="speed">
+          <span>Speed</span>
+        </label>
+        <div className="speed-field">
+          <input id="speed" type="range" min={0.5} max={3} step={0.1} value={speed} onChange={(e) => onSpeedChange(Number(e.target.value))} />
+          <span>{speed.toFixed(1)}x</span>
+        </div>
       </div>
-
-      <div className="row" style={{ marginTop: 10 }}>
-        <label htmlFor="use-skills">스킬 사용</label>
-        <input
-          id="use-skills"
-          type="checkbox"
-          checked={useSkills}
-          onChange={(e) => onUseSkillsChange(e.target.checked)}
-        />
-      </div>
-    </section>
+    </>
   );
 }

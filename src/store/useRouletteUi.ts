@@ -5,11 +5,17 @@ import { createInitialUiState, uiReducer } from './uiState';
 export function useRouletteUi() {
   const [state, dispatch] = useReducer(
     uiReducer,
-    createInitialUiState((import.meta.env.VITE_API_BASE_URL as string | undefined) || 'https://haneulbit-api.holyimpact.org')
+    createInitialUiState(
+      (import.meta.env.VITE_API_BASE_URL as string | undefined) || 'https://haneulbit-api.holyimpact.org'
+    )
   );
 
   const names = useMemo(
-    () => state.namesInput.split(/[\n,]/g).map((v) => v.trim()).filter(Boolean),
+    () =>
+      state.namesInput
+        .split(/[\n,]/g)
+        .map((v) => v.trim())
+        .filter(Boolean),
     [state.namesInput]
   );
 

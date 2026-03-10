@@ -1,4 +1,4 @@
-import { type MouseEventHandler, useEffect, useRef } from 'react';
+import type { PointerEventHandler } from 'react';
 import { initialZoom } from '../engine-core/data/constants';
 import type { MapEntityState } from '../engine-core/types/MapEntity.type';
 
@@ -16,94 +16,99 @@ type Props = {
   onHoverViewport: (pos?: { x: number; y: number }) => void;
 };
 
-const SCALE = 4;
 const MAP_WIDTH = 26;
 
 export function MinimapCard({ snapshot, onHoverViewport }: Props) {
-  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  if (!snapshot) return null;
 
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas || !snapshot) return;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
+  const stageHeight = Math.max(30, snapshot.stageGoalY);
+  const zoom = snapshot.camera.zoom * initialZoom;
+  const viewW = snapshot.viewport.width / zoom;
+  const viewH = snapshot.viewport.height / zoom;
 
-    const h = snapshot.stageGoalY * SCALE;
-    canvas.width = MAP_WIDTH * SCALE;
-    canvas.height = Math.max(120, h);
+  const toDegrees = (rotation: number) => {
+    if (Math.abs(rotation) > Math.PI * 2) return rotation;
+    return (rotation * 180) / Math.PI;
+  };
 
-    ctx.fillStyle = snapshot.theme.minimapBackground;
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-    ctx.save();
-    ctx.scale(SCALE, SCALE);
-
-    snapshot.entities.forEach((entity) => {
-      ctx.save();
-      ctx.translate(entity.x, entity.y);
-      ctx.rotate(entity.angle);
-      ctx.strokeStyle = entity.shape.color ?? '#ccc';
-      switch (entity.shape.type) {
-        case 'box': {
-          const w = entity.shape.width * 2;
-          const hh = entity.shape.height * 2;
-          ctx.rotate(entity.shape.rotation);
-          ctx.strokeRect(-w / 2, -hh / 2, w, hh);
-          break;
-        }
-        case 'circle':
-          ctx.beginPath();
-          ctx.arc(0, 0, entity.shape.radius, 0, Math.PI * 2);
-          ctx.stroke();
-          break;
-        case 'polyline':
-          if (entity.shape.points.length > 0) {
-            ctx.beginPath();
-            ctx.moveTo(entity.shape.points[0][0], entity.shape.points[0][1]);
-            for (let i = 1; i < entity.shape.points.length; i++) {
-              ctx.lineTo(entity.shape.points[i][0], entity.shape.points[i][1]);
-            }
-            ctx.stroke();
-          }
-          break;
-      }
-      ctx.restore();
-    });
-
-    snapshot.marbles.forEach((marble) => {
-      ctx.beginPath();
-      ctx.fillStyle = `hsl(${marble.hue} 100% 70%)`;
-      ctx.arc(marble.x, marble.y, 0.45, 0, Math.PI * 2);
-      ctx.fill();
-    });
-
-    const zoom = snapshot.camera.zoom * initialZoom;
-    const viewW = snapshot.viewport.width / zoom;
-    const viewH = snapshot.viewport.height / zoom;
-    ctx.strokeStyle = snapshot.theme.minimapViewport;
-    ctx.lineWidth = 0.3;
-    ctx.strokeRect(snapshot.camera.x - viewW / 2, snapshot.camera.y - viewH / 2, viewW, viewH);
-
-    ctx.restore();
-  }, [snapshot]);
-
-  const handleMove: MouseEventHandler<HTMLCanvasElement> = (e) => {
+  const handleMove: PointerEventHandler<SVGSVGElement> = (e) => {
     if (!snapshot) return;
     const rect = e.currentTarget.getBoundingClientRect();
     const x = ((e.clientX - rect.left) / rect.width) * MAP_WIDTH;
-    const y = ((e.clientY - rect.top) / rect.height) * snapshot.stageGoalY;
+    const y = ((e.clientY - rect.top) / rect.height) * stageHeight;
     onHoverViewport({ x, y });
   };
 
   return (
-    <section className="card">
-      <h2>미니맵 (React UI)</h2>
-      <canvas
-        ref={canvasRef}
+    <aside className="minimap-overlay" aria-label="Stage minimap">
+      <svg
         className="mini-map"
-        onMouseMove={handleMove}
-        onMouseLeave={() => onHoverViewport(undefined)}
-      />
-    </section>
+        viewBox={`0 0 ${MAP_WIDTH} ${stageHeight}`}
+        preserveAspectRatio="none"
+        onPointerMove={handleMove}
+        onPointerLeave={() => onHoverViewport(undefined)}
+      >
+        <rect width={MAP_WIDTH} height={stageHeight} fill={snapshot.theme.minimapBackground} />
+
+        {snapshot.entities.map((entity, index) => {
+          const stroke = entity.shape.color ?? 'rgba(255,255,255,0.35)';
+
+          if (entity.shape.type === 'polyline') {
+            return (
+              <g key={`polyline-${index}`} transform={`translate(${entity.x} ${entity.y}) rotate(${toDegrees(entity.angle)})`}>
+                <polyline
+                  points={entity.shape.points.map(([x, y]) => `${x},${y}`).join(' ')}
+                  fill="none"
+                  stroke={stroke}
+                  strokeWidth="0.4"
+                  strokeLinejoin="round"
+                  strokeLinecap="round"
+                />
+              </g>
+            );
+          }
+
+          if (entity.shape.type === 'circle') {
+            return (
+              <g key={`circle-${index}`} transform={`translate(${entity.x} ${entity.y}) rotate(${toDegrees(entity.angle)})`}>
+                <circle r={entity.shape.radius} fill="none" stroke={stroke} strokeWidth="0.35" />
+              </g>
+            );
+          }
+
+          const width = entity.shape.width * 2;
+          const height = entity.shape.height * 2;
+          return (
+            <g key={`box-${index}`} transform={`translate(${entity.x} ${entity.y}) rotate(${toDegrees(entity.angle)})`}>
+              <g transform={`rotate(${toDegrees(entity.shape.rotation)})`}>
+                <rect
+                  x={-width / 2}
+                  y={-height / 2}
+                  width={width}
+                  height={height}
+                  fill="rgba(255,255,255,0.05)"
+                  stroke={stroke}
+                  strokeWidth="0.3"
+                />
+              </g>
+            </g>
+          );
+        })}
+
+        {snapshot.marbles.map((marble) => (
+          <circle key={`${marble.name}-${marble.x}-${marble.y}`} cx={marble.x} cy={marble.y} r="0.45" fill={`hsl(${marble.hue} 100% 70%)`} />
+        ))}
+
+        <rect
+          x={snapshot.camera.x - viewW / 2}
+          y={snapshot.camera.y - viewH / 2}
+          width={viewW}
+          height={viewH}
+          fill="none"
+          stroke={snapshot.theme.minimapViewport}
+          strokeWidth="0.35"
+        />
+      </svg>
+    </aside>
   );
 }

@@ -15,6 +15,7 @@ import { type RecordingReadyDetail, VideoRecorder } from './utils/videoRecorder'
 
 type RouletteInitOptions = {
   mountElement?: HTMLElement;
+  canvasElement?: HTMLCanvasElement;
 };
 
 export class Roulette extends EventTarget {
@@ -34,6 +35,7 @@ export class Roulette extends EventTarget {
   protected _camera: Camera = new Camera();
   protected _renderer: RouletteRenderer;
   private _mountElement?: HTMLElement;
+  private _canvasElement?: HTMLCanvasElement;
 
   private _effects: GameObject[] = [];
 
@@ -42,7 +44,6 @@ export class Roulette extends EventTarget {
   private _goalDist: number = Infinity;
   private _isRunning: boolean = false;
   private _winner: Marble | null = null;
-
 
   private _autoRecording: boolean = false;
   private _recorder: VideoRecorder | null = null;
@@ -64,12 +65,13 @@ export class Roulette extends EventTarget {
   }
 
   protected createRenderer(): RouletteRenderer {
-    return new RouletteRenderer(this._mountElement);
+    return new RouletteRenderer({ mountElement: this._mountElement, canvasElement: this._canvasElement });
   }
 
   constructor(options?: RouletteInitOptions) {
     super();
     this._mountElement = options?.mountElement;
+    this._canvasElement = options?.canvasElement;
     this._renderer = this.createRenderer();
     void this._boot();
   }
@@ -95,7 +97,6 @@ export class Roulette extends EventTarget {
   public getZoom() {
     return initialZoom * this._camera.zoom;
   }
-
 
   @bound
   private _update() {
@@ -239,7 +240,6 @@ export class Roulette extends EventTarget {
     this._stage = stages[0];
     this._loadMap();
   }
-
 
   private _loadMap() {
     if (!this._stage) {
@@ -392,13 +392,17 @@ export class Roulette extends EventTarget {
     const winners = this._winners.map((marble, index) => ({
       rank: index + 1,
       name: marble.name,
+      hue: marble.hue,
       isTarget: index === this._winnerRank,
+      isWinner: true,
     }));
 
     const pending = this._marbles.map((marble, index) => ({
       rank: winners.length + index + 1,
       name: marble.name,
+      hue: marble.hue,
       isTarget: winners.length + index === this._winnerRank,
+      isWinner: false,
     }));
 
     return [...winners, ...pending];
@@ -413,7 +417,6 @@ export class Roulette extends EventTarget {
     this.setMarbles(names);
     this._camera.initializePosition();
   }
-
 
   public setFastForwardEnabled(enabled: boolean) {
     this._fastForwardEnabled = enabled;
@@ -437,6 +440,7 @@ export class Roulette extends EventTarget {
       viewport: { width: this._renderer.width, height: this._renderer.height },
       marbles: this._marbles.map((m) => ({ x: m.x, y: m.y, hue: m.hue, name: m.name })),
       entities: this.physics.getEntities(),
+      winner: this._winner ? { name: this._winner.name, hue: this._winner.hue } : null,
       theme: {
         minimapBackground: this._theme.minimapBackground,
         minimapViewport: this._theme.minimapViewport,

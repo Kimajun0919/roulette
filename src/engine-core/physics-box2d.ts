@@ -1,6 +1,6 @@
 import Box2DFactory from 'box2d-wasm';
-import box2dWasmUrl from 'box2d-wasm/dist/es/Box2D.wasm?url';
 import box2dSimdWasmUrl from 'box2d-wasm/dist/es/Box2D.simd.wasm?url';
+import box2dWasmUrl from 'box2d-wasm/dist/es/Box2D.wasm?url';
 import type { StageDef } from './data/maps';
 import type { IPhysics } from './IPhysics';
 import type { MapEntity, MapEntityState } from './types/MapEntity.type';

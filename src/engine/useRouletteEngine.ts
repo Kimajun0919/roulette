@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
-import { RouletteEngineAdapter, type RecordingResult, type WinnerType } from './RouletteEngineAdapter';
+import { type RecordingResult, RouletteEngineAdapter, type WinnerType } from './RouletteEngineAdapter';
 
 type Params = {
-  mountElement: HTMLElement | null;
+  canvasElement: HTMLCanvasElement | null;
   names: string[];
   winnerRank: number;
   winnerType: WinnerType;
@@ -15,7 +15,9 @@ type Params = {
 type RankingItem = {
   rank: number;
   name: string;
+  hue: number;
   isTarget: boolean;
+  isWinner: boolean;
 };
 
 type RecordingDownload = {
@@ -26,7 +28,7 @@ type RecordingDownload = {
 type UiSnapshot = NonNullable<ReturnType<RouletteEngineAdapter['getUiSnapshot']>>;
 
 export function useRouletteEngine({
-  mountElement,
+  canvasElement,
   names,
   winnerRank,
   winnerType,
@@ -47,7 +49,7 @@ export function useRouletteEngine({
   const recordingUrlRef = useRef<string | null>(null);
 
   useEffect(() => {
-    if (!mountElement) return;
+    if (!canvasElement) return;
 
     setEngineReady(false);
     setGoalWinner(null);
@@ -62,13 +64,13 @@ export function useRouletteEngine({
     }
     setRecordingDownload(null);
 
-    const nextEngine = new RouletteEngineAdapter(mountElement);
+    const nextEngine = new RouletteEngineAdapter({ canvasElement });
     setEngine(nextEngine);
 
     return () => {
       nextEngine.destroy();
     };
-  }, [mountElement]);
+  }, [canvasElement]);
 
   useEffect(() => {
     if (!engine) return;
