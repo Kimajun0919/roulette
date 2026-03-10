@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { drawApi } from './api/client';
-import type { DrawRecord } from './api/types';
-import { DataSyncCard } from './components/DataSyncCard';
+import { loadAttendanceWeights, type AttendanceWeight } from './api/haneulbit';
+import { ApiModeCard } from './components/ApiModeCard';
 import { DrawOptionsCard } from './components/DrawOptionsCard';
 import { EngineStatusCard } from './components/EngineStatusCard';
 import { MapThemeCard } from './components/MapThemeCard';
@@ -28,10 +27,14 @@ export function App() {
   const [selectedMap, setSelectedMap] = useState(0);
   const [themes, setThemes] = useState<string[]>([]);
   const [theme, setTheme] = useState('dark');
-  const [records, setRecords] = useState<DrawRecord[]>([]);
-  const [syncStatus, setSyncStatus] = useState('idle');
-
-  const apiBase = (import.meta.env.VITE_API_BASE_URL as string | undefined) || '';
+  const [mode, setMode] = useState<'local' | 'api'>('local');
+  const [apiBaseUrl, setApiBaseUrl] = useState(
+    (import.meta.env.VITE_API_BASE_URL as string | undefined) || 'https://haneulbit-api.holyimpact.org'
+  );
+  const [apiToken, setApiToken] = useState('');
+  const [apiStatus, setApiStatus] = useState('idle');
+  const [apiRole, setApiRole] = useState('');
+  const [weights, setWeights] = useState<AttendanceWeight[]>([]);
 
   const names = useMemo(() => namesInput.split(/[\n,]/g).map((v) => v.trim()).filter(Boolean), [namesInput]);
 
@@ -120,26 +123,17 @@ export function App() {
     engine.setWinnerRank(winnerRank, winnerType, names.length);
   };
 
-  const refreshRecords = async () => {
+  const loadFromAttendanceApi = async () => {
     try {
-      setSyncStatus('loading list...');
-      const list = await drawApi.list();
-      setRecords(list);
-      setSyncStatus(`loaded ${list.length} record(s)`);
+      setApiStatus('loading...');
+      const { me, weights } = await loadAttendanceWeights(apiBaseUrl, apiToken.trim());
+      setApiRole(me.role || 'unknown');
+      setWeights(weights);
+      const weightedNames = weights.map((w) => `${w.name}*${Math.max(1, w.count)}`);
+      setNamesInput(weightedNames.join('\n'));
+      setApiStatus(`loaded ${weights.length} users (approved attendance based weights)`);
     } catch (err) {
-      setSyncStatus(`list failed: ${err instanceof Error ? err.message : String(err)}`);
-    }
-  };
-
-  const saveCurrentResult = async () => {
-    if (!goalWinner || names.length === 0) return;
-    try {
-      setSyncStatus('saving...');
-      await drawApi.create({ participants: names, winner: goalWinner, winnerRank, winnerType });
-      setSyncStatus('saved');
-      await refreshRecords();
-    } catch (err) {
-      setSyncStatus(`save failed: ${err instanceof Error ? err.message : String(err)}`);
+      setApiStatus(`failed: ${err instanceof Error ? err.message : String(err)}`);
     }
   };
 
@@ -149,6 +143,18 @@ export function App() {
       <p className="desc">루트 화면도 React로 전환했고, Canvas는 React mount 노드 안에서 생성됩니다.</p>
 
       <EngineStatusCard engineReady={engineReady} />
+      <ApiModeCard
+        mode={mode}
+        onModeChange={setMode}
+        apiBaseUrl={apiBaseUrl}
+        apiToken={apiToken}
+        apiStatus={apiStatus}
+        apiRole={apiRole}
+        weights={weights}
+        onApiBaseUrlChange={setApiBaseUrl}
+        onApiTokenChange={setApiToken}
+        onLoadAttendance={loadFromAttendanceApi}
+      />
       <ParticipantsCard
         namesInput={namesInput}
         namesCount={names.length}
@@ -198,14 +204,7 @@ export function App() {
         <h2>Canvas Host (React mount)</h2>
         <div ref={canvasHostRef} className="canvas-host" />
       </section>
-      <DataSyncCard
-        apiBase={apiBase}
-        status={syncStatus}
-        records={records}
-        onRefresh={refreshRecords}
-        onSave={saveCurrentResult}
-        canSave={!!goalWinner && names.length > 0}
-      />
+      {/* data sync card removed: replaced by API mode card */}
       <NextStepsCard />
     </main>
   );
