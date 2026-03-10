@@ -1,7 +1,7 @@
-import { registerServiceWorker } from '../../src/registerServiceWorker';
-import { Marble } from '../../src/marble';
-import { Roulette } from '../../src/roulette';
-import { Themes } from '../../src/data/constants';
+import { registerServiceWorker } from '../engine-core/registerServiceWorker';
+import { Marble } from '../engine-core/marble';
+import { Roulette } from '../engine-core/roulette';
+import { Themes } from '../engine-core/data/constants';
 
 export type WinnerType = 'first' | 'last' | 'custom';
 

@@ -1,4 +1,4 @@
-import '../src/localization';
+import './engine-core/localization';
 import { RouletteEngineAdapter } from './engine/RouletteEngineAdapter';
 
 export function createEngine(mountElement?: HTMLElement) {

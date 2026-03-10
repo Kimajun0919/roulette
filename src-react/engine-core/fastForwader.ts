@@ -13,7 +13,7 @@ export class FastForwader implements UIObject {
 
   constructor() {
     this.icon = new Image();
-    this.icon.src = new URL('../assets/images/ff.svg', import.meta.url).toString();
+    this.icon.src = new URL('../../assets/images/ff.svg', import.meta.url).toString();
   }
 
   private isEnabled: boolean = false;
