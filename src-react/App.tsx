@@ -1,6 +1,15 @@
 import { useEffect, useMemo, useState } from 'react';
-import { getEngine } from './legacyEngine';
+import { drawApi } from './api/client';
+import type { DrawRecord } from './api/types';
+import { DataSyncCard } from './components/DataSyncCard';
+import { DrawOptionsCard } from './components/DrawOptionsCard';
+import { EngineStatusCard } from './components/EngineStatusCard';
+import { MapThemeCard } from './components/MapThemeCard';
+import { NextStepsCard } from './components/NextStepsCard';
+import { ParticipantsCard } from './components/ParticipantsCard';
+import { RunCard } from './components/RunCard';
 import type { WinnerType } from './engine/RouletteEngineAdapter';
+import { getEngine } from './legacyEngine';
 
 export function App() {
   const [engine] = useState(() => getEngine());
@@ -15,6 +24,10 @@ export function App() {
   const [selectedMap, setSelectedMap] = useState(0);
   const [themes, setThemes] = useState<string[]>([]);
   const [theme, setTheme] = useState('dark');
+  const [records, setRecords] = useState<DrawRecord[]>([]);
+  const [syncStatus, setSyncStatus] = useState('idle');
+
+  const apiBase = (import.meta.env.VITE_API_BASE_URL as string | undefined) || '';
 
   const names = useMemo(
     () => namesInput.split(/[\n,]/g).map((v) => v.trim()).filter(Boolean),
@@ -78,12 +91,6 @@ export function App() {
     engine.setWinnerRank(winnerRank, winnerType, names.length);
   };
 
-  const onSpeedChange = (next: number) => {
-    setSpeed(next);
-    if (!engineReady) return;
-    engine.setSpeed(next);
-  };
-
   const onMapChange = (index: number) => {
     setSelectedMap(index);
     if (!engineReady) return;
@@ -92,127 +99,80 @@ export function App() {
     engine.setWinnerRank(winnerRank, winnerType, names.length);
   };
 
+  const refreshRecords = async () => {
+    try {
+      setSyncStatus('loading list...');
+      const list = await drawApi.list();
+      setRecords(list);
+      setSyncStatus(`loaded ${list.length} record(s)`);
+    } catch (err) {
+      setSyncStatus(`list failed: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  };
+
+  const saveCurrentResult = async () => {
+    if (!goalWinner || names.length === 0) return;
+    try {
+      setSyncStatus('saving...');
+      await drawApi.create({
+        participants: names,
+        winner: goalWinner,
+        winnerRank,
+        winnerType,
+      });
+      setSyncStatus('saved');
+      await refreshRecords();
+    } catch (err) {
+      setSyncStatus(`save failed: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  };
+
   return (
     <main className="container">
-      <h1>Roulette React Migration (Phase 3)</h1>
-      <p className="desc">레거시 inline script 없이 React 상태 + 어댑터 기반으로 UI를 이관 중입니다.</p>
+      <h1>Roulette React Migration (Phase 3+)</h1>
+      <p className="desc">컴포넌트 분해 + 엔진 어댑터 + 백엔드 연동 스캐폴드 결합 단계입니다.</p>
 
-      <section className="card">
-        <h2>엔진 상태</h2>
-        <p>{engineReady ? '✅ 준비 완료' : '⏳ 초기화 중...'}</p>
-        <p className="muted">Canvas는 레거시 엔진이 body에 생성합니다(최종 단계에서 React mount로 이동 예정).</p>
-      </section>
-
-      <section className="card">
-        <h2>참가자 입력</h2>
-        <textarea
-          rows={8}
-          placeholder={'한 줄에 한 명씩 입력\n예) 김철수\n홍길동/2\n이영희*2'}
-          value={namesInput}
-          onChange={(e) => setNamesInput(e.target.value)}
-        />
-        <p className="muted">현재 인원: {names.length}명</p>
-      </section>
-
-      <section className="card">
-        <h2>추첨 옵션</h2>
-        <div className="row">
-          <button className={winnerType === 'first' ? 'active' : ''} onClick={() => setWinnerType('first')}>첫번째</button>
-          <button className={winnerType === 'last' ? 'active' : ''} onClick={() => setWinnerType('last')}>마지막</button>
-          <button className={winnerType === 'custom' ? 'active' : ''} onClick={() => setWinnerType('custom')}>직접입력</button>
-        </div>
-
-        {winnerType === 'custom' && (
-          <div className="row" style={{ marginTop: 10 }}>
-            <label htmlFor="winner-rank">당첨 순위</label>
-            <input
-              id="winner-rank"
-              type="number"
-              min={1}
-              value={winnerRankInput}
-              onChange={(e) => setWinnerRankInput(Number(e.target.value || 1))}
-            />
-          </div>
-        )}
-
-        <div className="row" style={{ marginTop: 10 }}>
-          <label htmlFor="speed">속도</label>
-          <input
-            id="speed"
-            type="range"
-            min={0.5}
-            max={3}
-            step={0.1}
-            value={speed}
-            onChange={(e) => onSpeedChange(Number(e.target.value))}
-          />
-          <span>{speed.toFixed(1)}x</span>
-        </div>
-
-        <div className="row" style={{ marginTop: 10 }}>
-          <label htmlFor="auto-recording">자동 녹화</label>
-          <input
-            id="auto-recording"
-            type="checkbox"
-            checked={autoRecording}
-            onChange={(e) => setAutoRecording(e.target.checked)}
-          />
-        </div>
-      </section>
-
-      <section className="card">
-        <h2>맵/테마</h2>
-        <div className="row">
-          <label htmlFor="map-select">맵</label>
-          <select
-            id="map-select"
-            value={selectedMap}
-            onChange={(e) => onMapChange(Number(e.target.value))}
-            disabled={!engineReady}
-          >
-            {maps.map((m) => (
-              <option key={m.index} value={m.index}>
-                {m.index + 1}. {m.title}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        <div className="row" style={{ marginTop: 10 }}>
-          <label htmlFor="theme-select">테마</label>
-          <select
-            id="theme-select"
-            value={theme}
-            onChange={(e) => setTheme(e.target.value)}
-            disabled={!engineReady}
-          >
-            {themes.map((name) => (
-              <option key={name} value={name}>
-                {name}
-              </option>
-            ))}
-          </select>
-        </div>
-      </section>
-
-      <section className="card">
-        <h2>실행</h2>
-        <div className="row">
-          <button onClick={onStart} disabled={!engineReady || names.length === 0}>추첨 시작</button>
-          <button onClick={onReset} disabled={!engineReady}>리셋</button>
-        </div>
-        <p className="muted">현재 당첨 순위 기준: {winnerRank}번째</p>
-        <p>{goalWinner ? `🏆 당첨자: ${goalWinner}` : '아직 당첨자 없음'}</p>
-      </section>
-
-      <section className="card">
-        <h2>다음 단계</h2>
-        <ul>
-          <li>추첨 데이터 백엔드 연동 (`src-react/api`) + 저장/조회 UI</li>
-          <li>Figma MCP 연결 대비 컴포넌트 분해 (Panel, Form, ResultCard)</li>
-          <li>엔진 canvas를 React mount 노드로 이동해 완전 분리</li>
-        </ul>
-      </section>
+      <EngineStatusCard engineReady={engineReady} />
+      <ParticipantsCard namesInput={namesInput} namesCount={names.length} onChange={setNamesInput} />
+      <DrawOptionsCard
+        winnerType={winnerType}
+        winnerRankInput={winnerRankInput}
+        speed={speed}
+        autoRecording={autoRecording}
+        onWinnerTypeChange={setWinnerType}
+        onWinnerRankInputChange={setWinnerRankInput}
+        onSpeedChange={(next) => {
+          setSpeed(next);
+          if (engineReady) engine.setSpeed(next);
+        }}
+        onAutoRecordingChange={setAutoRecording}
+      />
+      <MapThemeCard
+        engineReady={engineReady}
+        maps={maps}
+        selectedMap={selectedMap}
+        onMapChange={onMapChange}
+        themes={themes}
+        theme={theme}
+        onThemeChange={setTheme}
+      />
+      <RunCard
+        engineReady={engineReady}
+        namesCount={names.length}
+        winnerRank={winnerRank}
+        goalWinner={goalWinner}
+        onStart={onStart}
+        onReset={onReset}
+      />
+      <DataSyncCard
+        apiBase={apiBase}
+        status={syncStatus}
+        records={records}
+        onRefresh={refreshRecords}
+        onSave={saveCurrentResult}
+        canSave={!!goalWinner && names.length > 0}
+      />
+      <NextStepsCard />
     </main>
   );
 }
