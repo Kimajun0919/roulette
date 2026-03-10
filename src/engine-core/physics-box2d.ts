@@ -1,4 +1,6 @@
 import Box2DFactory from 'box2d-wasm';
+import box2dSimdWasmUrl from 'box2d-wasm/dist/es/Box2D.simd.wasm?url';
+import box2dWasmUrl from 'box2d-wasm/dist/es/Box2D.wasm?url';
 import type { StageDef } from './data/maps';
 import type { IPhysics } from './IPhysics';
 import type { MapEntity, MapEntityState } from './types/MapEntity.type';
@@ -14,7 +16,13 @@ export class Box2dPhysics implements IPhysics {
   private deleteCandidates: Box2D.b2Body[] = [];
 
   async init(): Promise<void> {
-    this.Box2D = await Box2DFactory();
+    this.Box2D = await Box2DFactory({
+      locateFile: (path: string) => {
+        if (path.includes('simd') && path.endsWith('.wasm')) return box2dSimdWasmUrl;
+        if (path.endsWith('.wasm')) return box2dWasmUrl;
+        return path;
+      },
+    });
     this.gravity = new this.Box2D.b2Vec2(0, 10);
     this.world = new this.Box2D.b2World(this.gravity);
     console.log('box2d ready');

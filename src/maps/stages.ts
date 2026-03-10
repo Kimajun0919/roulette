@@ -1,4 +1,4 @@
-import type { MapEntity } from '../types/MapEntity.type';
+import type { MapEntity } from '../engine-core/types/MapEntity.type';
 
 export type StageDef = {
   title: string;

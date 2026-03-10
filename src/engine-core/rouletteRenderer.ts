@@ -8,7 +8,6 @@ import type { ParticleManager } from './particleManager';
 import type { ColorTheme } from './types/ColorTheme';
 import type { MapEntityState } from './types/MapEntity.type';
 import type { VectorLike } from './types/VectorLike';
-import type { UIObject } from './UIObject';
 
 export type RenderParameters = {
   camera: Camera;
@@ -32,9 +31,16 @@ export class RouletteRenderer {
   protected _images: { [key: string]: HTMLImageElement } = {};
   protected _theme: ColorTheme = Themes.dark;
   protected _keywordService: KeywordService;
+  protected _mountElement: HTMLElement;
+  protected _providedCanvas?: HTMLCanvasElement;
+  private _resizeObserver: ResizeObserver | null = null;
+  private _isDestroyed = false;
+  private _ownsCanvas = false;
 
-  constructor() {
+  constructor(options?: { mountElement?: HTMLElement; canvasElement?: HTMLCanvasElement }) {
     this._keywordService = this.createKeywordService();
+    this._mountElement = options?.mountElement ?? document.body;
+    this._providedCanvas = options?.canvasElement;
   }
 
   protected createKeywordService(): KeywordService {
@@ -59,15 +65,19 @@ export class RouletteRenderer {
 
   async init() {
     await Promise.all([this._load(), this._keywordService.init()]);
+    if (this._isDestroyed) return;
 
-    this._canvas = document.createElement('canvas');
+    this._canvas = this._providedCanvas ?? document.createElement('canvas');
+    this._ownsCanvas = !this._providedCanvas;
     this._canvas.width = canvasWidth;
     this._canvas.height = canvasHeight;
     this.ctx = this._canvas.getContext('2d', {
       alpha: false,
     }) as CanvasRenderingContext2D;
 
-    document.body.appendChild(this._canvas);
+    if (this._ownsCanvas) {
+      this._mountElement.appendChild(this._canvas);
+    }
 
     const resizing = (entries?: ResizeObserverEntry[]) => {
       const realSize = entries ? entries[0].contentRect : this._canvas.getBoundingClientRect();
@@ -78,10 +88,19 @@ export class RouletteRenderer {
       this.sizeFactor = width / realSize.width;
     };
 
-    const resizeObserver = new ResizeObserver(resizing);
-
-    resizeObserver.observe(this._canvas);
+    this._resizeObserver = new ResizeObserver(resizing);
+    this._resizeObserver.observe(this._canvas);
     resizing();
+  }
+
+  destroy() {
+    this._isDestroyed = true;
+    this._resizeObserver?.disconnect();
+    this._resizeObserver = null;
+    this._keywordService.destroy();
+    if (this._ownsCanvas && this._canvas?.isConnected) {
+      this._canvas.remove();
+    }
   }
 
   private async _loadImage(url: string): Promise<HTMLImageElement> {
@@ -96,24 +115,18 @@ export class RouletteRenderer {
 
   private async _load(): Promise<void> {
     const loadPromises = [
-      { name: '챔루', imgUrl: new URL('../assets/images/chamru.png', import.meta.url) },
-      { name: '쿠빈', imgUrl: new URL('../assets/images/kubin.png', import.meta.url) },
-      { name: '꽉변', imgUrl: new URL('../assets/images/kkwak.png', import.meta.url) },
-      { name: '꽉변호사', imgUrl: new URL('../assets/images/kkwak.png', import.meta.url) },
-      { name: '꽉 변호사', imgUrl: new URL('../assets/images/kkwak.png', import.meta.url) },
-      { name: '주누피', imgUrl: new URL('../assets/images/junyoop.png', import.meta.url) },
-      { name: '왈도쿤', imgUrl: new URL('../assets/images/waldokun.png', import.meta.url) },
+      { name: '챔루', imgUrl: new URL('../../assets/images/chamru.png', import.meta.url) },
+      { name: '쿠빈', imgUrl: new URL('../../assets/images/kubin.png', import.meta.url) },
+      { name: '꽉변', imgUrl: new URL('../../assets/images/kkwak.png', import.meta.url) },
+      { name: '꽉변호사', imgUrl: new URL('../../assets/images/kkwak.png', import.meta.url) },
+      { name: '꽉 변호사', imgUrl: new URL('../../assets/images/kkwak.png', import.meta.url) },
+      { name: '주누피', imgUrl: new URL('../../assets/images/junyoop.png', import.meta.url) },
+      { name: '왈도쿤', imgUrl: new URL('../../assets/images/waldokun.png', import.meta.url) },
     ].map(({ name, imgUrl }) => {
       return (async () => {
         this._images[name] = await this._loadImage(imgUrl.toString());
       })();
     });
-
-    loadPromises.push(
-      (async () => {
-        await this._loadImage(new URL('../assets/images/ff.svg', import.meta.url).toString());
-      })()
-    );
 
     await Promise.all(loadPromises);
   }
@@ -130,7 +143,7 @@ export class RouletteRenderer {
   protected onBeforeEntities(): void {}
   protected onAfterScene(): void {}
 
-  render(renderParameters: RenderParameters, uiObjects: UIObject[]) {
+  render(renderParameters: RenderParameters) {
     this._theme = renderParameters.theme;
     this.ctx.fillStyle = this._theme.background;
     this.ctx.fillRect(0, 0, this._canvas.width, this._canvas.height);
@@ -150,9 +163,7 @@ export class RouletteRenderer {
     this.ctx.restore();
     this.onAfterScene();
 
-    uiObjects.forEach((obj) => obj.render(this.ctx, renderParameters, this._canvas.width, this._canvas.height));
     renderParameters.particleManager.render(this.ctx);
-    this.renderWinner(renderParameters);
   }
 
   private renderEntities(entities: MapEntityState[]) {
@@ -217,53 +228,5 @@ export class RouletteRenderer {
         this._theme
       );
     });
-  }
-
-  private renderWinner({ winner, theme }: RenderParameters) {
-    if (!winner) return;
-    this.ctx.save();
-    this.ctx.fillStyle = theme.winnerBackground;
-    this.ctx.fillRect(this._canvas.width / 2, this._canvas.height - 168, this._canvas.width / 2, 168);
-
-    // Draw marble image or colored circle
-    const marbleSize = 100;
-    const marbleCenterX = this._canvas.width - marbleSize / 2 - 20;
-    const marbleCenterY = this._canvas.height - 168 / 2;
-    const marbleImage = this.getMarbleImage(winner.name);
-
-    if (marbleImage) {
-      this.ctx.drawImage(
-        marbleImage,
-        marbleCenterX - marbleSize / 2,
-        marbleCenterY - marbleSize / 2,
-        marbleSize,
-        marbleSize
-      );
-    } else {
-      this.ctx.beginPath();
-      this.ctx.arc(marbleCenterX, marbleCenterY, marbleSize / 2, 0, Math.PI * 2);
-      this.ctx.fillStyle = `hsl(${winner.hue} 100% ${theme.marbleLightness})`;
-      this.ctx.fill();
-    }
-
-    this.ctx.fillStyle = theme.winnerText;
-    this.ctx.strokeStyle = theme.winnerOutline;
-
-    this.ctx.font = 'bold 48px sans-serif';
-    this.ctx.textAlign = 'right';
-    this.ctx.lineWidth = 4;
-    const textRightX = marbleCenterX - marbleSize / 2 - 20;
-    if (theme.winnerOutline) {
-      this.ctx.strokeText('Winner', textRightX, this._canvas.height - 120);
-    }
-
-    this.ctx.fillText('Winner', textRightX, this._canvas.height - 120);
-    this.ctx.font = 'bold 72px sans-serif';
-    this.ctx.fillStyle = `hsl(${winner.hue} 100% ${theme.marbleLightness})`;
-    if (theme.winnerOutline) {
-      this.ctx.strokeText(winner.name, textRightX, this._canvas.height - 55);
-    }
-    this.ctx.fillText(winner.name, textRightX, this._canvas.height - 55);
-    this.ctx.restore();
   }
 }

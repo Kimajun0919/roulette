@@ -1,23 +1,22 @@
 import { Camera } from './camera';
 import { canvasHeight, canvasWidth, initialZoom, Skills, Themes, zoomThreshold } from './data/constants';
 import { type StageDef, stages } from './data/maps';
-import { FastForwader } from './fastForwader';
 import type { GameObject } from './gameObject';
 import type { IPhysics } from './IPhysics';
 import { Marble } from './marble';
-import { Minimap } from './minimap';
-import options from './options';
 import { ParticleManager } from './particleManager';
 import { Box2dPhysics } from './physics-box2d';
-import { RankRenderer } from './rankRenderer';
 import { RouletteRenderer } from './rouletteRenderer';
 import { SkillEffect } from './skillEffect';
 import type { ColorTheme } from './types/ColorTheme';
-import type { MouseEventHandlerName, MouseEventName } from './types/mouseEvents.type';
-import type { UIObject } from './UIObject';
 import { bound } from './utils/bound.decorator';
 import { parseName, shuffle } from './utils/utils';
-import { VideoRecorder } from './utils/videoRecorder';
+import { type RecordingReadyDetail, VideoRecorder } from './utils/videoRecorder';
+
+type RouletteInitOptions = {
+  mountElement?: HTMLElement;
+  canvasElement?: HTMLCanvasElement;
+};
 
 export class Roulette extends EventTarget {
   private _marbles: Marble[] = [];
@@ -35,6 +34,8 @@ export class Roulette extends EventTarget {
 
   protected _camera: Camera = new Camera();
   protected _renderer: RouletteRenderer;
+  private _mountElement?: HTMLElement;
+  private _canvasElement?: HTMLCanvasElement;
 
   private _effects: GameObject[] = [];
 
@@ -44,63 +45,67 @@ export class Roulette extends EventTarget {
   private _isRunning: boolean = false;
   private _winner: Marble | null = null;
 
-  private _uiObjects: UIObject[] = [];
-
   private _autoRecording: boolean = false;
-  private _recorder!: VideoRecorder;
+  private _recorder: VideoRecorder | null = null;
 
   private physics!: IPhysics;
 
   private _isReady: boolean = false;
-  protected fastForwarder!: FastForwader;
   protected _theme: ColorTheme = Themes.dark;
+  private _fastForwardEnabled = false;
+  private _animationFrameId: number | null = null;
+  private _cleanupFns: Array<() => void> = [];
+  private _timeoutIds: number[] = [];
+  private _destroyed = false;
+  private _didCleanup = false;
+  private _onRecorderReady?: (event: Event) => void;
 
   get isReady() {
     return this._isReady;
   }
 
   protected createRenderer(): RouletteRenderer {
-    return new RouletteRenderer();
+    return new RouletteRenderer({ mountElement: this._mountElement, canvasElement: this._canvasElement });
   }
 
-  protected createFastForwader(): FastForwader {
-    return new FastForwader();
-  }
-
-  constructor() {
+  constructor(options?: RouletteInitOptions) {
     super();
+    this._mountElement = options?.mountElement;
+    this._canvasElement = options?.canvasElement;
     this._renderer = this.createRenderer();
-    this._renderer.init().then(() => {
-      this._init().then(() => {
-        this._isReady = true;
-        this._update();
-      });
-    });
+    void this._boot();
+  }
+
+  private async _boot() {
+    await this._renderer.init();
+    if (this._destroyed) {
+      this._cleanup();
+      return;
+    }
+
+    await this._init();
+    if (this._destroyed) {
+      this._cleanup();
+      return;
+    }
+
+    this._isReady = true;
+    this.dispatchEvent(new Event('ready'));
+    this._update();
   }
 
   public getZoom() {
     return initialZoom * this._camera.zoom;
   }
 
-  private addUiObject(obj: UIObject) {
-    this._uiObjects.push(obj);
-    if (obj.onWheel) {
-      this._renderer.canvas.addEventListener('wheel', obj.onWheel);
-    }
-    if (obj.onMessage) {
-      obj.onMessage((msg) => {
-        console.log('onMessage', msg);
-        this.dispatchEvent(new CustomEvent('message', { detail: msg }));
-      });
-    }
-  }
-
   @bound
   private _update() {
+    if (this._destroyed) return;
     if (!this._lastTime) this._lastTime = Date.now();
     const currentTime = Date.now();
 
-    this._elapsed += (currentTime - this._lastTime) * this._speed * this.fastForwarder.speed;
+    const fastForwardMultiplier = this._fastForwardEnabled ? 2 : 1;
+    this._elapsed += (currentTime - this._lastTime) * this._speed * fastForwardMultiplier;
     if (this._elapsed > 100) {
       this._elapsed %= 100;
     }
@@ -114,7 +119,6 @@ export class Roulette extends EventTarget {
       this._particleManager.update(this._updateInterval);
       this._updateEffects(this._updateInterval);
       this._elapsed -= this._updateInterval;
-      this._uiObjects.forEach((obj) => obj.update(this._updateInterval));
     }
 
     if (this._marbles.length > 1) {
@@ -131,7 +135,7 @@ export class Roulette extends EventTarget {
     }
 
     this._render();
-    window.requestAnimationFrame(this._update);
+    this._animationFrameId = window.requestAnimationFrame(this._update);
   }
 
   private _updateMarbles(deltaTime: number) {
@@ -151,8 +155,8 @@ export class Roulette extends EventTarget {
           this._winner = marble;
           this._isRunning = false;
           this._particleManager.shot(this._renderer.width, this._renderer.height);
-          setTimeout(() => {
-            this._recorder.stop();
+          this._setManagedTimeout(() => {
+            this._recorder?.stop();
           }, 1000);
         } else if (
           this._isRunning &&
@@ -167,11 +171,11 @@ export class Roulette extends EventTarget {
           this._winner = this._marbles[i + 1];
           this._isRunning = false;
           this._particleManager.shot(this._renderer.width, this._renderer.height);
-          setTimeout(() => {
-            this._recorder.stop();
+          this._setManagedTimeout(() => {
+            this._recorder?.stop();
           }, 1000);
         }
-        setTimeout(() => {
+        this._setManagedTimeout(() => {
           this.physics.removeMarble(marble.id);
         }, 500);
       }
@@ -219,79 +223,22 @@ export class Roulette extends EventTarget {
       size: { x: this._renderer.width, y: this._renderer.height },
       theme: this._theme,
     };
-    this._renderer.render(renderParams, this._uiObjects);
+    this._renderer.render(renderParams);
   }
 
   private async _init() {
     this._recorder = new VideoRecorder(this._renderer.canvas);
+    this._onRecorderReady = (event: Event) => {
+      const detail = (event as CustomEvent<RecordingReadyDetail>).detail;
+      this.dispatchEvent(new CustomEvent<RecordingReadyDetail>('recordingready', { detail }));
+    };
+    this._recorder.addEventListener('recordingready', this._onRecorderReady);
 
     this.physics = new Box2dPhysics();
     await this.physics.init();
 
-    this.addUiObject(new RankRenderer());
-    this.attachEvent();
-    const minimap = new Minimap();
-    minimap.onViewportChange((pos) => {
-      if (pos) {
-        this._camera.setPosition(pos, false);
-        this._camera.lock(true);
-      } else {
-        this._camera.lock(false);
-      }
-    });
-    this.addUiObject(minimap);
-    this.fastForwarder = this.createFastForwader();
-    this.addUiObject(this.fastForwarder);
     this._stage = stages[0];
     this._loadMap();
-  }
-
-  @bound
-  private mouseHandler(eventName: MouseEventName, e: MouseEvent) {
-    const handlerName = `on${eventName}` as MouseEventHandlerName;
-
-    const sizeFactor = this._renderer.sizeFactor;
-    const pos = { x: e.offsetX * sizeFactor, y: e.offsetY * sizeFactor };
-    this._uiObjects.forEach((obj) => {
-      if (!obj[handlerName]) return;
-      const bounds = obj.getBoundingBox();
-      if (!bounds) {
-        obj[handlerName]({ ...pos, button: e.button });
-      } else if (
-        bounds &&
-        pos.x >= bounds.x &&
-        pos.y >= bounds.y &&
-        pos.x <= bounds.x + bounds.w &&
-        pos.y <= bounds.y + bounds.h
-      ) {
-        obj[handlerName]({ x: pos.x - bounds.x, y: pos.y - bounds.y, button: e.button });
-      } else {
-        obj[handlerName](undefined);
-      }
-    });
-  }
-
-  private attachEvent() {
-    const canvas = this._renderer.canvas;
-    const onPointerRelease = (e: Event) => {
-      this.mouseHandler('MouseUp', e as MouseEvent);
-      window.removeEventListener('pointerup', onPointerRelease);
-      window.removeEventListener('pointercancel', onPointerRelease);
-    };
-
-    canvas.addEventListener('pointerdown', (e: Event) => {
-      this.mouseHandler('MouseDown', e as MouseEvent);
-      window.addEventListener('pointerup', onPointerRelease);
-      window.addEventListener('pointercancel', onPointerRelease);
-    });
-
-    ['MouseMove', 'DblClick'].forEach((ev) => {
-      // @ts-expect-error
-      canvas.addEventListener(ev.toLowerCase().replace('mouse', 'pointer'), this.mouseHandler.bind(this, ev));
-    });
-    canvas.addEventListener('contextmenu', (e) => {
-      e.preventDefault();
-    });
   }
 
   private _loadMap() {
@@ -312,13 +259,12 @@ export class Roulette extends EventTarget {
 
   public start() {
     this._isRunning = true;
-    this._winnerRank = options.winningRank;
     if (this._winnerRank >= this._marbles.length) {
       this._winnerRank = this._marbles.length - 1;
     }
     this._camera.startFollowingMarbles();
 
-    if (this._autoRecording) {
+    if (this._autoRecording && this._recorder) {
       this._recorder.start().then(() => {
         this.physics.start();
         this._marbles.forEach((marble) => (marble.isActive = true));
@@ -442,6 +388,26 @@ export class Roulette extends EventTarget {
     });
   }
 
+  public getRankingSnapshot() {
+    const winners = this._winners.map((marble, index) => ({
+      rank: index + 1,
+      name: marble.name,
+      hue: marble.hue,
+      isTarget: index === this._winnerRank,
+      isWinner: true,
+    }));
+
+    const pending = this._marbles.map((marble, index) => ({
+      rank: winners.length + index + 1,
+      name: marble.name,
+      hue: marble.hue,
+      isTarget: winners.length + index === this._winnerRank,
+      isWinner: false,
+    }));
+
+    return [...winners, ...pending];
+  }
+
   public setMap(index: number) {
     if (index < 0 || index > stages.length - 1) {
       throw new Error('Incorrect map number');
@@ -450,5 +416,81 @@ export class Roulette extends EventTarget {
     this._stage = stages[index];
     this.setMarbles(names);
     this._camera.initializePosition();
+  }
+
+  public setFastForwardEnabled(enabled: boolean) {
+    this._fastForwardEnabled = enabled;
+  }
+
+  public setCameraViewportPosition(pos?: { x: number; y: number }) {
+    if (pos) {
+      this._camera.setPosition(pos, false);
+      this._camera.lock(true);
+    } else {
+      this._camera.lock(false);
+    }
+  }
+
+  public getUiSnapshot() {
+    if (!this._stage) return null;
+
+    return {
+      stageGoalY: this._stage.goalY,
+      camera: { x: this._camera.x, y: this._camera.y, zoom: this._camera.zoom },
+      viewport: { width: this._renderer.width, height: this._renderer.height },
+      marbles: this._marbles.map((m) => ({ x: m.x, y: m.y, hue: m.hue, name: m.name })),
+      entities: this.physics.getEntities(),
+      winner: this._winner ? { name: this._winner.name, hue: this._winner.hue } : null,
+      theme: {
+        minimapBackground: this._theme.minimapBackground,
+        minimapViewport: this._theme.minimapViewport,
+      },
+    };
+  }
+
+  public destroy() {
+    this._destroyed = true;
+    this._cleanup();
+  }
+
+  private _setManagedTimeout(callback: () => void, delay: number) {
+    const timerId = window.setTimeout(() => {
+      this._timeoutIds = this._timeoutIds.filter((id) => id !== timerId);
+      if (!this._destroyed) {
+        callback();
+      }
+    }, delay);
+    this._timeoutIds.push(timerId);
+  }
+
+  private _cleanup() {
+    if (this._didCleanup) return;
+    this._didCleanup = true;
+
+    this._isReady = false;
+    this._isRunning = false;
+
+    if (this._animationFrameId !== null) {
+      window.cancelAnimationFrame(this._animationFrameId);
+      this._animationFrameId = null;
+    }
+
+    this._timeoutIds.forEach((timerId) => window.clearTimeout(timerId));
+    this._timeoutIds = [];
+
+    this._cleanupFns.splice(0).forEach((cleanup) => cleanup());
+
+    if (this._recorder && this._onRecorderReady) {
+      this._recorder.removeEventListener('recordingready', this._onRecorderReady);
+    }
+    this._recorder?.destroy();
+    this._recorder = null;
+    this._onRecorderReady = undefined;
+
+    if (this.physics) {
+      this.physics.clearMarbles();
+      this.physics.clear();
+    }
+    this._renderer.destroy();
   }
 }
