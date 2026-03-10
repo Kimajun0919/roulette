@@ -33,6 +33,8 @@ export class RouletteRenderer {
   protected _theme: ColorTheme = Themes.dark;
   protected _keywordService: KeywordService;
   protected _mountElement: HTMLElement;
+  private _resizeObserver: ResizeObserver | null = null;
+  private _isDestroyed = false;
 
   constructor(mountElement?: HTMLElement) {
     this._keywordService = this.createKeywordService();
@@ -61,6 +63,7 @@ export class RouletteRenderer {
 
   async init() {
     await Promise.all([this._load(), this._keywordService.init()]);
+    if (this._isDestroyed) return;
 
     this._canvas = document.createElement('canvas');
     this._canvas.width = canvasWidth;
@@ -80,10 +83,19 @@ export class RouletteRenderer {
       this.sizeFactor = width / realSize.width;
     };
 
-    const resizeObserver = new ResizeObserver(resizing);
-
-    resizeObserver.observe(this._canvas);
+    this._resizeObserver = new ResizeObserver(resizing);
+    this._resizeObserver.observe(this._canvas);
     resizing();
+  }
+
+  destroy() {
+    this._isDestroyed = true;
+    this._resizeObserver?.disconnect();
+    this._resizeObserver = null;
+    this._keywordService.destroy();
+    if (this._canvas?.isConnected) {
+      this._canvas.remove();
+    }
   }
 
   private async _loadImage(url: string): Promise<HTMLImageElement> {

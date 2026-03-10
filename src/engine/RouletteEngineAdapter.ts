@@ -1,8 +1,10 @@
 import { Marble } from '../engine-core/marble';
 import { Roulette } from '../engine-core/roulette';
 import { Themes } from '../engine-core/data/constants';
+import type { RecordingReadyDetail } from '../engine-core/utils/videoRecorder';
 
 export type WinnerType = 'first' | 'last' | 'custom';
+export type RecordingResult = RecordingReadyDetail;
 
 export class RouletteEngineAdapter {
   private roulette: Roulette;
@@ -13,6 +15,14 @@ export class RouletteEngineAdapter {
 
   get isReady() {
     return this.roulette.isReady;
+  }
+
+  onReady(callback: () => void) {
+    const handler = () => {
+      callback();
+    };
+    this.roulette.addEventListener('ready', handler);
+    return () => this.roulette.removeEventListener('ready', handler);
   }
 
   onGoal(callback: (winner: string | null) => void) {
@@ -31,6 +41,15 @@ export class RouletteEngineAdapter {
     };
     this.roulette.addEventListener('message', handler);
     return () => this.roulette.removeEventListener('message', handler);
+  }
+
+  onRecordingReady(callback: (result: RecordingResult) => void) {
+    const handler = (ev: Event) => {
+      const detail = (ev as CustomEvent<RecordingResult>).detail;
+      callback(detail);
+    };
+    this.roulette.addEventListener('recordingready', handler);
+    return () => this.roulette.removeEventListener('recordingready', handler);
   }
 
   setNames(names: string[]) {
@@ -90,5 +109,9 @@ export class RouletteEngineAdapter {
   setTheme(themeName: string) {
     if (!(themeName in Themes)) return;
     this.roulette.setTheme(themeName as keyof typeof Themes);
+  }
+
+  destroy() {
+    this.roulette.destroy();
   }
 }

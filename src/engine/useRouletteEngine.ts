@@ -1,7 +1,5 @@
-import { useEffect, useState } from 'react';
-import { createEngine } from '../legacyEngine';
-import type { WinnerType } from './RouletteEngineAdapter';
-import type { RouletteEngineAdapter } from './RouletteEngineAdapter';
+import { useEffect, useRef, useState } from 'react';
+import { RouletteEngineAdapter, type RecordingResult, type WinnerType } from './RouletteEngineAdapter';
 
 type Params = {
   mountElement: HTMLElement | null;
@@ -18,6 +16,11 @@ type RankingItem = {
   rank: number;
   name: string;
   isTarget: boolean;
+};
+
+type RecordingDownload = {
+  url: string;
+  fileName: string;
 };
 
 export function useRouletteEngine({
@@ -37,41 +40,81 @@ export function useRouletteEngine({
   const [maps, setMaps] = useState<Array<{ index: number; title: string }>>([]);
   const [themes, setThemes] = useState<string[]>([]);
   const [ranking, setRanking] = useState<RankingItem[]>([]);
+  const [recordingDownload, setRecordingDownload] = useState<RecordingDownload | null>(null);
+  const recordingUrlRef = useRef<string | null>(null);
 
   useEffect(() => {
-    if (!mountElement || engine) return;
-    setEngine(createEngine(mountElement));
-  }, [mountElement, engine]);
+    if (!mountElement) return;
+
+    setEngineReady(false);
+    setGoalWinner(null);
+    setLastMessage(null);
+    setMaps([]);
+    setThemes([]);
+    setRanking([]);
+    if (recordingUrlRef.current) {
+      URL.revokeObjectURL(recordingUrlRef.current);
+      recordingUrlRef.current = null;
+    }
+    setRecordingDownload(null);
+
+    const nextEngine = new RouletteEngineAdapter(mountElement);
+    setEngine(nextEngine);
+
+    return () => {
+      nextEngine.destroy();
+    };
+  }, [mountElement]);
 
   useEffect(() => {
     if (!engine) return;
-    const checkReady = () => {
-      if (engine.isReady) {
-        setEngineReady(true);
-        setMaps(engine.getMaps());
-        setThemes(engine.getThemeNames());
-        return true;
-      }
-      return false;
+
+    const syncReady = () => {
+      setEngineReady(true);
+      setMaps(engine.getMaps());
+      setThemes(engine.getThemeNames());
     };
 
-    if (!checkReady()) {
-      const timer = window.setInterval(() => {
-        if (checkReady()) window.clearInterval(timer);
-      }, 100);
-      return () => window.clearInterval(timer);
+    if (engine.isReady) {
+      syncReady();
     }
+
+    const offReady = engine.onReady(syncReady);
+    return () => {
+      offReady();
+    };
   }, [engine]);
 
   useEffect(() => {
     if (!engine) return;
     const offGoal = engine.onGoal((winner) => setGoalWinner(winner));
     const offMessage = engine.onMessage((msg) => setLastMessage(msg));
+    const offRecording = engine.onRecordingReady((recording: RecordingResult) => {
+      const nextUrl = URL.createObjectURL(recording.blob);
+      if (recordingUrlRef.current) {
+        URL.revokeObjectURL(recordingUrlRef.current);
+      }
+      recordingUrlRef.current = nextUrl;
+      setRecordingDownload({
+        url: nextUrl,
+        fileName: recording.fileName,
+      });
+    });
+
     return () => {
       offGoal();
       offMessage();
+      offRecording();
     };
   }, [engine]);
+
+  useEffect(() => {
+    return () => {
+      if (recordingUrlRef.current) {
+        URL.revokeObjectURL(recordingUrlRef.current);
+      }
+    };
+  }, []);
 
   useEffect(() => {
     if (!engine || !engineReady) return;
@@ -136,6 +179,7 @@ export function useRouletteEngine({
     maps,
     themes,
     ranking,
+    recordingDownload,
     start,
     reset,
     setMap,

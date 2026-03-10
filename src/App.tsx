@@ -13,7 +13,7 @@ export function App() {
   const [canvasHostEl, setCanvasHostEl] = useState<HTMLDivElement | null>(null);
   const { state, dispatch, names, winnerRank, shuffleNames, loadFromAttendanceApi } = useRouletteUi();
 
-  const { engineReady, goalWinner, lastMessage, maps, themes, ranking, start, reset, setMap } = useRouletteEngine({
+  const { engineReady, goalWinner, lastMessage, maps, themes, ranking, recordingDownload, start, reset, setMap } = useRouletteEngine({
     mountElement: canvasHostEl,
     names,
     winnerRank,
@@ -79,6 +79,7 @@ export function App() {
         namesCount={names.length}
         winnerRank={winnerRank}
         goalWinner={goalWinner}
+        recordingDownload={recordingDownload}
         onStart={start}
         onReset={reset}
       />

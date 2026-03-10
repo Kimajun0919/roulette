@@ -15,7 +15,7 @@ import type { MouseEventHandlerName, MouseEventName } from './types/mouseEvents.
 import type { UIObject } from './UIObject';
 import { bound } from './utils/bound.decorator';
 import { parseName, shuffle } from './utils/utils';
-import { VideoRecorder } from './utils/videoRecorder';
+import { type RecordingReadyDetail, VideoRecorder } from './utils/videoRecorder';
 
 type RouletteInitOptions = {
   mountElement?: HTMLElement;
@@ -50,13 +50,19 @@ export class Roulette extends EventTarget {
   private _uiObjects: UIObject[] = [];
 
   private _autoRecording: boolean = false;
-  private _recorder!: VideoRecorder;
+  private _recorder: VideoRecorder | null = null;
 
   private physics!: IPhysics;
 
   private _isReady: boolean = false;
   protected fastForwarder!: FastForwader;
   protected _theme: ColorTheme = Themes.dark;
+  private _animationFrameId: number | null = null;
+  private _cleanupFns: Array<() => void> = [];
+  private _timeoutIds: number[] = [];
+  private _destroyed = false;
+  private _didCleanup = false;
+  private _onRecorderReady?: (event: Event) => void;
 
   get isReady() {
     return this._isReady;
@@ -74,12 +80,25 @@ export class Roulette extends EventTarget {
     super();
     this._mountElement = options?.mountElement;
     this._renderer = this.createRenderer();
-    this._renderer.init().then(() => {
-      this._init().then(() => {
-        this._isReady = true;
-        this._update();
-      });
-    });
+    void this._boot();
+  }
+
+  private async _boot() {
+    await this._renderer.init();
+    if (this._destroyed) {
+      this._cleanup();
+      return;
+    }
+
+    await this._init();
+    if (this._destroyed) {
+      this._cleanup();
+      return;
+    }
+
+    this._isReady = true;
+    this.dispatchEvent(new Event('ready'));
+    this._update();
   }
 
   public getZoom() {
@@ -90,6 +109,7 @@ export class Roulette extends EventTarget {
     this._uiObjects.push(obj);
     if (obj.onWheel) {
       this._renderer.canvas.addEventListener('wheel', obj.onWheel);
+      this._cleanupFns.push(() => this._renderer.canvas.removeEventListener('wheel', obj.onWheel!));
     }
     if (obj.onMessage) {
       obj.onMessage((msg) => {
@@ -101,6 +121,7 @@ export class Roulette extends EventTarget {
 
   @bound
   private _update() {
+    if (this._destroyed) return;
     if (!this._lastTime) this._lastTime = Date.now();
     const currentTime = Date.now();
 
@@ -135,7 +156,7 @@ export class Roulette extends EventTarget {
     }
 
     this._render();
-    window.requestAnimationFrame(this._update);
+    this._animationFrameId = window.requestAnimationFrame(this._update);
   }
 
   private _updateMarbles(deltaTime: number) {
@@ -155,8 +176,8 @@ export class Roulette extends EventTarget {
           this._winner = marble;
           this._isRunning = false;
           this._particleManager.shot(this._renderer.width, this._renderer.height);
-          setTimeout(() => {
-            this._recorder.stop();
+          this._setManagedTimeout(() => {
+            this._recorder?.stop();
           }, 1000);
         } else if (
           this._isRunning &&
@@ -171,11 +192,11 @@ export class Roulette extends EventTarget {
           this._winner = this._marbles[i + 1];
           this._isRunning = false;
           this._particleManager.shot(this._renderer.width, this._renderer.height);
-          setTimeout(() => {
-            this._recorder.stop();
+          this._setManagedTimeout(() => {
+            this._recorder?.stop();
           }, 1000);
         }
-        setTimeout(() => {
+        this._setManagedTimeout(() => {
           this.physics.removeMarble(marble.id);
         }, 500);
       }
@@ -228,6 +249,11 @@ export class Roulette extends EventTarget {
 
   private async _init() {
     this._recorder = new VideoRecorder(this._renderer.canvas);
+    this._onRecorderReady = (event: Event) => {
+      const detail = (event as CustomEvent<RecordingReadyDetail>).detail;
+      this.dispatchEvent(new CustomEvent<RecordingReadyDetail>('recordingready', { detail }));
+    };
+    this._recorder.addEventListener('recordingready', this._onRecorderReady);
 
     this.physics = new Box2dPhysics();
     await this.physics.init();
@@ -282,19 +308,32 @@ export class Roulette extends EventTarget {
       window.removeEventListener('pointercancel', onPointerRelease);
     };
 
-    canvas.addEventListener('pointerdown', (e: Event) => {
+    const onPointerDown = (e: Event) => {
       this.mouseHandler('MouseDown', e as MouseEvent);
       window.addEventListener('pointerup', onPointerRelease);
       window.addEventListener('pointercancel', onPointerRelease);
+    };
+
+    canvas.addEventListener('pointerdown', onPointerDown);
+    this._cleanupFns.push(() => {
+      canvas.removeEventListener('pointerdown', onPointerDown);
+      window.removeEventListener('pointerup', onPointerRelease);
+      window.removeEventListener('pointercancel', onPointerRelease);
     });
 
     ['MouseMove', 'DblClick'].forEach((ev) => {
+      const eventName = ev.toLowerCase().replace('mouse', 'pointer');
+      const handler = this.mouseHandler.bind(this, ev);
       // @ts-expect-error
-      canvas.addEventListener(ev.toLowerCase().replace('mouse', 'pointer'), this.mouseHandler.bind(this, ev));
+      canvas.addEventListener(eventName, handler);
+      this._cleanupFns.push(() => canvas.removeEventListener(eventName, handler));
     });
-    canvas.addEventListener('contextmenu', (e) => {
+
+    const onContextMenu = (e: Event) => {
       e.preventDefault();
-    });
+    };
+    canvas.addEventListener('contextmenu', onContextMenu);
+    this._cleanupFns.push(() => canvas.removeEventListener('contextmenu', onContextMenu));
   }
 
   private _loadMap() {
@@ -320,7 +359,7 @@ export class Roulette extends EventTarget {
     }
     this._camera.startFollowingMarbles();
 
-    if (this._autoRecording) {
+    if (this._autoRecording && this._recorder) {
       this._recorder.start().then(() => {
         this.physics.start();
         this._marbles.forEach((marble) => (marble.isActive = true));
@@ -468,5 +507,51 @@ export class Roulette extends EventTarget {
     this._stage = stages[index];
     this.setMarbles(names);
     this._camera.initializePosition();
+  }
+
+  public destroy() {
+    this._destroyed = true;
+    this._cleanup();
+  }
+
+  private _setManagedTimeout(callback: () => void, delay: number) {
+    const timerId = window.setTimeout(() => {
+      this._timeoutIds = this._timeoutIds.filter((id) => id !== timerId);
+      if (!this._destroyed) {
+        callback();
+      }
+    }, delay);
+    this._timeoutIds.push(timerId);
+  }
+
+  private _cleanup() {
+    if (this._didCleanup) return;
+    this._didCleanup = true;
+
+    this._isReady = false;
+    this._isRunning = false;
+
+    if (this._animationFrameId !== null) {
+      window.cancelAnimationFrame(this._animationFrameId);
+      this._animationFrameId = null;
+    }
+
+    this._timeoutIds.forEach((timerId) => window.clearTimeout(timerId));
+    this._timeoutIds = [];
+
+    this._cleanupFns.splice(0).forEach((cleanup) => cleanup());
+
+    if (this._recorder && this._onRecorderReady) {
+      this._recorder.removeEventListener('recordingready', this._onRecorderReady);
+    }
+    this._recorder?.destroy();
+    this._recorder = null;
+    this._onRecorderReady = undefined;
+
+    if (this.physics) {
+      this.physics.clearMarbles();
+      this.physics.clear();
+    }
+    this._renderer.destroy();
   }
 }

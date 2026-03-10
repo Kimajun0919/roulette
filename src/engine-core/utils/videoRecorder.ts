@@ -1,38 +1,38 @@
 import { pad } from './utils';
 
-export class VideoRecorder {
-  private targetCanvas: HTMLCanvasElement;
+export type RecordingReadyDetail = {
+  blob: Blob;
+  fileName: string;
+};
+
+export class VideoRecorder extends EventTarget {
   private mediaRecorder: MediaRecorder;
   private videoStream: MediaStream;
-
   private chunks: Blob[] = [];
 
   constructor(canvas: HTMLCanvasElement) {
-    this.targetCanvas = canvas;
-    this.videoStream = this.targetCanvas.captureStream();
+    super();
+    this.videoStream = canvas.captureStream();
     this.mediaRecorder = new MediaRecorder(this.videoStream, {
       videoBitsPerSecond: 6000000,
     });
   }
 
   public async start() {
-    this.stopping = false;
     return new Promise<void>((rs) => {
       this.chunks = [];
       this.mediaRecorder.ondataavailable = (e: BlobEvent) => {
         this.chunks.push(e.data);
       };
       this.mediaRecorder.onstop = () => {
-        const blob = new Blob(this.chunks, { type: 'video/mp4' });
-        const videoUrl = URL.createObjectURL(blob);
-        const downloadLink = document.createElement('a');
-        const d = new Date();
-
-        downloadLink.href = videoUrl;
-        downloadLink.download = `marble_roulette_${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}.mp4`;
-        downloadLink.click();
-        downloadLink.remove();
-        URL.revokeObjectURL(videoUrl);
+        this.dispatchEvent(
+          new CustomEvent<RecordingReadyDetail>('recordingready', {
+            detail: {
+              blob: new Blob(this.chunks, { type: 'video/mp4' }),
+              fileName: this.getFileName(),
+            },
+          })
+        );
       };
       this.mediaRecorder.onstart = () => {
         rs();
@@ -42,9 +42,22 @@ export class VideoRecorder {
   }
 
   public stop() {
-    this.stopping = true;
     if (this.mediaRecorder.state === 'recording') {
       this.mediaRecorder.stop();
     }
+  }
+
+  public destroy() {
+    this.stop();
+    this.mediaRecorder.ondataavailable = null;
+    this.mediaRecorder.onstop = null;
+    this.mediaRecorder.onstart = null;
+    this.videoStream.getTracks().forEach((track) => track.stop());
+    this.chunks = [];
+  }
+
+  private getFileName() {
+    const d = new Date();
+    return `marble_roulette_${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}.mp4`;
   }
 }
