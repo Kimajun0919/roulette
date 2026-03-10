@@ -98,6 +98,18 @@ export class RouletteEngineAdapter {
     this.roulette.setMap(index);
   }
 
+  setFastForwardEnabled(enabled: boolean) {
+    this.roulette.setFastForwardEnabled(enabled);
+  }
+
+  setCameraViewportPosition(pos?: { x: number; y: number }) {
+    this.roulette.setCameraViewportPosition(pos);
+  }
+
+  getUiSnapshot() {
+    return this.roulette.getUiSnapshot();
+  }
+
   getRankingSnapshot() {
     return this.roulette.getRankingSnapshot();
   }

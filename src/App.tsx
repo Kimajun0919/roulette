@@ -3,6 +3,7 @@ import { ApiModeCard } from './components/ApiModeCard';
 import { DrawOptionsCard } from './components/DrawOptionsCard';
 import { EngineStatusCard } from './components/EngineStatusCard';
 import { MapThemeCard } from './components/MapThemeCard';
+import { MinimapCard } from './components/MinimapCard';
 import { NextStepsCard } from './components/NextStepsCard';
 import { ParticipantsCard } from './components/ParticipantsCard';
 import { RunCard } from './components/RunCard';
@@ -13,7 +14,21 @@ export function App() {
   const [canvasHostEl, setCanvasHostEl] = useState<HTMLDivElement | null>(null);
   const { state, dispatch, names, winnerRank, shuffleNames, loadFromAttendanceApi } = useRouletteUi();
 
-  const { engineReady, goalWinner, lastMessage, maps, themes, ranking, recordingDownload, start, reset, setMap } = useRouletteEngine({
+  const {
+    engineReady,
+    goalWinner,
+    lastMessage,
+    maps,
+    themes,
+    ranking,
+    uiSnapshot,
+    recordingDownload,
+    start,
+    reset,
+    setMap,
+    setFastForwardEnabled,
+    setCameraViewportPosition,
+  } = useRouletteEngine({
     mountElement: canvasHostEl,
     names,
     winnerRank,
@@ -82,7 +97,9 @@ export function App() {
         recordingDownload={recordingDownload}
         onStart={start}
         onReset={reset}
+        onFastForwardChange={setFastForwardEnabled}
       />
+      <MinimapCard snapshot={uiSnapshot} onHoverViewport={setCameraViewportPosition} />
       <section className="card">
         <h2>순위 (React UI)</h2>
         {ranking.length === 0 ? (

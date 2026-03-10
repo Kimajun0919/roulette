@@ -23,6 +23,8 @@ type RecordingDownload = {
   fileName: string;
 };
 
+type UiSnapshot = NonNullable<ReturnType<RouletteEngineAdapter['getUiSnapshot']>>;
+
 export function useRouletteEngine({
   mountElement,
   names,
@@ -40,6 +42,7 @@ export function useRouletteEngine({
   const [maps, setMaps] = useState<Array<{ index: number; title: string }>>([]);
   const [themes, setThemes] = useState<string[]>([]);
   const [ranking, setRanking] = useState<RankingItem[]>([]);
+  const [uiSnapshot, setUiSnapshot] = useState<UiSnapshot | null>(null);
   const [recordingDownload, setRecordingDownload] = useState<RecordingDownload | null>(null);
   const recordingUrlRef = useRef<string | null>(null);
 
@@ -52,6 +55,7 @@ export function useRouletteEngine({
     setMaps([]);
     setThemes([]);
     setRanking([]);
+    setUiSnapshot(null);
     if (recordingUrlRef.current) {
       URL.revokeObjectURL(recordingUrlRef.current);
       recordingUrlRef.current = null;
@@ -119,7 +123,11 @@ export function useRouletteEngine({
   useEffect(() => {
     if (!engine || !engineReady) return;
 
-    const sync = () => setRanking(engine.getRankingSnapshot());
+    const sync = () => {
+      setRanking(engine.getRankingSnapshot());
+      setUiSnapshot(engine.getUiSnapshot());
+    };
+
     sync();
     const timer = window.setInterval(sync, 100);
     return () => window.clearInterval(timer);
@@ -172,6 +180,16 @@ export function useRouletteEngine({
     engine.setWinnerRank(winnerRank, winnerType, names.length);
   };
 
+  const setFastForwardEnabled = (enabled: boolean) => {
+    if (!engine || !engineReady) return;
+    engine.setFastForwardEnabled(enabled);
+  };
+
+  const setCameraViewportPosition = (pos?: { x: number; y: number }) => {
+    if (!engine || !engineReady) return;
+    engine.setCameraViewportPosition(pos);
+  };
+
   return {
     engineReady,
     goalWinner,
@@ -179,9 +197,12 @@ export function useRouletteEngine({
     maps,
     themes,
     ranking,
+    uiSnapshot,
     recordingDownload,
     start,
     reset,
     setMap,
+    setFastForwardEnabled,
+    setCameraViewportPosition,
   };
 }

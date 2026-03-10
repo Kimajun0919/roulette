@@ -1,18 +1,14 @@
 import { Camera } from './camera';
 import { canvasHeight, canvasWidth, initialZoom, Skills, Themes, zoomThreshold } from './data/constants';
 import { type StageDef, stages } from './data/maps';
-import { FastForwader } from './fastForwader';
 import type { GameObject } from './gameObject';
 import type { IPhysics } from './IPhysics';
 import { Marble } from './marble';
-import { Minimap } from './minimap';
 import { ParticleManager } from './particleManager';
 import { Box2dPhysics } from './physics-box2d';
 import { RouletteRenderer } from './rouletteRenderer';
 import { SkillEffect } from './skillEffect';
 import type { ColorTheme } from './types/ColorTheme';
-import type { MouseEventHandlerName, MouseEventName } from './types/mouseEvents.type';
-import type { UIObject } from './UIObject';
 import { bound } from './utils/bound.decorator';
 import { parseName, shuffle } from './utils/utils';
 import { type RecordingReadyDetail, VideoRecorder } from './utils/videoRecorder';
@@ -47,7 +43,6 @@ export class Roulette extends EventTarget {
   private _isRunning: boolean = false;
   private _winner: Marble | null = null;
 
-  private _uiObjects: UIObject[] = [];
 
   private _autoRecording: boolean = false;
   private _recorder: VideoRecorder | null = null;
@@ -55,8 +50,8 @@ export class Roulette extends EventTarget {
   private physics!: IPhysics;
 
   private _isReady: boolean = false;
-  protected fastForwarder!: FastForwader;
   protected _theme: ColorTheme = Themes.dark;
+  private _fastForwardEnabled = false;
   private _animationFrameId: number | null = null;
   private _cleanupFns: Array<() => void> = [];
   private _timeoutIds: number[] = [];
@@ -70,10 +65,6 @@ export class Roulette extends EventTarget {
 
   protected createRenderer(): RouletteRenderer {
     return new RouletteRenderer(this._mountElement);
-  }
-
-  protected createFastForwader(): FastForwader {
-    return new FastForwader();
   }
 
   constructor(options?: RouletteInitOptions) {
@@ -105,19 +96,6 @@ export class Roulette extends EventTarget {
     return initialZoom * this._camera.zoom;
   }
 
-  private addUiObject(obj: UIObject) {
-    this._uiObjects.push(obj);
-    if (obj.onWheel) {
-      this._renderer.canvas.addEventListener('wheel', obj.onWheel);
-      this._cleanupFns.push(() => this._renderer.canvas.removeEventListener('wheel', obj.onWheel!));
-    }
-    if (obj.onMessage) {
-      obj.onMessage((msg) => {
-        console.log('onMessage', msg);
-        this.dispatchEvent(new CustomEvent('message', { detail: msg }));
-      });
-    }
-  }
 
   @bound
   private _update() {
@@ -125,7 +103,8 @@ export class Roulette extends EventTarget {
     if (!this._lastTime) this._lastTime = Date.now();
     const currentTime = Date.now();
 
-    this._elapsed += (currentTime - this._lastTime) * this._speed * this.fastForwarder.speed;
+    const fastForwardMultiplier = this._fastForwardEnabled ? 2 : 1;
+    this._elapsed += (currentTime - this._lastTime) * this._speed * fastForwardMultiplier;
     if (this._elapsed > 100) {
       this._elapsed %= 100;
     }
@@ -139,7 +118,6 @@ export class Roulette extends EventTarget {
       this._particleManager.update(this._updateInterval);
       this._updateEffects(this._updateInterval);
       this._elapsed -= this._updateInterval;
-      this._uiObjects.forEach((obj) => obj.update(this._updateInterval));
     }
 
     if (this._marbles.length > 1) {
@@ -244,7 +222,7 @@ export class Roulette extends EventTarget {
       size: { x: this._renderer.width, y: this._renderer.height },
       theme: this._theme,
     };
-    this._renderer.render(renderParams, this._uiObjects);
+    this._renderer.render(renderParams);
   }
 
   private async _init() {
@@ -258,83 +236,10 @@ export class Roulette extends EventTarget {
     this.physics = new Box2dPhysics();
     await this.physics.init();
 
-    this.attachEvent();
-    const minimap = new Minimap();
-    minimap.onViewportChange((pos) => {
-      if (pos) {
-        this._camera.setPosition(pos, false);
-        this._camera.lock(true);
-      } else {
-        this._camera.lock(false);
-      }
-    });
-    this.addUiObject(minimap);
-    this.fastForwarder = this.createFastForwader();
-    this.addUiObject(this.fastForwarder);
     this._stage = stages[0];
     this._loadMap();
   }
 
-  @bound
-  private mouseHandler(eventName: MouseEventName, e: MouseEvent) {
-    const handlerName = `on${eventName}` as MouseEventHandlerName;
-
-    const sizeFactor = this._renderer.sizeFactor;
-    const pos = { x: e.offsetX * sizeFactor, y: e.offsetY * sizeFactor };
-    this._uiObjects.forEach((obj) => {
-      if (!obj[handlerName]) return;
-      const bounds = obj.getBoundingBox();
-      if (!bounds) {
-        obj[handlerName]({ ...pos, button: e.button });
-      } else if (
-        bounds &&
-        pos.x >= bounds.x &&
-        pos.y >= bounds.y &&
-        pos.x <= bounds.x + bounds.w &&
-        pos.y <= bounds.y + bounds.h
-      ) {
-        obj[handlerName]({ x: pos.x - bounds.x, y: pos.y - bounds.y, button: e.button });
-      } else {
-        obj[handlerName](undefined);
-      }
-    });
-  }
-
-  private attachEvent() {
-    const canvas = this._renderer.canvas;
-    const onPointerRelease = (e: Event) => {
-      this.mouseHandler('MouseUp', e as MouseEvent);
-      window.removeEventListener('pointerup', onPointerRelease);
-      window.removeEventListener('pointercancel', onPointerRelease);
-    };
-
-    const onPointerDown = (e: Event) => {
-      this.mouseHandler('MouseDown', e as MouseEvent);
-      window.addEventListener('pointerup', onPointerRelease);
-      window.addEventListener('pointercancel', onPointerRelease);
-    };
-
-    canvas.addEventListener('pointerdown', onPointerDown);
-    this._cleanupFns.push(() => {
-      canvas.removeEventListener('pointerdown', onPointerDown);
-      window.removeEventListener('pointerup', onPointerRelease);
-      window.removeEventListener('pointercancel', onPointerRelease);
-    });
-
-    ['MouseMove', 'DblClick'].forEach((ev) => {
-      const eventName = ev.toLowerCase().replace('mouse', 'pointer');
-      const handler = this.mouseHandler.bind(this, ev);
-      // @ts-expect-error
-      canvas.addEventListener(eventName, handler);
-      this._cleanupFns.push(() => canvas.removeEventListener(eventName, handler));
-    });
-
-    const onContextMenu = (e: Event) => {
-      e.preventDefault();
-    };
-    canvas.addEventListener('contextmenu', onContextMenu);
-    this._cleanupFns.push(() => canvas.removeEventListener('contextmenu', onContextMenu));
-  }
 
   private _loadMap() {
     if (!this._stage) {
@@ -507,6 +412,36 @@ export class Roulette extends EventTarget {
     this._stage = stages[index];
     this.setMarbles(names);
     this._camera.initializePosition();
+  }
+
+
+  public setFastForwardEnabled(enabled: boolean) {
+    this._fastForwardEnabled = enabled;
+  }
+
+  public setCameraViewportPosition(pos?: { x: number; y: number }) {
+    if (pos) {
+      this._camera.setPosition(pos, false);
+      this._camera.lock(true);
+    } else {
+      this._camera.lock(false);
+    }
+  }
+
+  public getUiSnapshot() {
+    if (!this._stage) return null;
+
+    return {
+      stageGoalY: this._stage.goalY,
+      camera: { x: this._camera.x, y: this._camera.y, zoom: this._camera.zoom },
+      viewport: { width: this._renderer.width, height: this._renderer.height },
+      marbles: this._marbles.map((m) => ({ x: m.x, y: m.y, hue: m.hue, name: m.name })),
+      entities: this.physics.getEntities(),
+      theme: {
+        minimapBackground: this._theme.minimapBackground,
+        minimapViewport: this._theme.minimapViewport,
+      },
+    };
   }
 
   public destroy() {

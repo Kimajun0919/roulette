@@ -8,7 +8,6 @@ import type { ParticleManager } from './particleManager';
 import type { ColorTheme } from './types/ColorTheme';
 import type { MapEntityState } from './types/MapEntity.type';
 import type { VectorLike } from './types/VectorLike';
-import type { UIObject } from './UIObject';
 
 export type RenderParameters = {
   camera: Camera;
@@ -144,7 +143,7 @@ export class RouletteRenderer {
   protected onBeforeEntities(): void {}
   protected onAfterScene(): void {}
 
-  render(renderParameters: RenderParameters, uiObjects: UIObject[]) {
+  render(renderParameters: RenderParameters) {
     this._theme = renderParameters.theme;
     this.ctx.fillStyle = this._theme.background;
     this.ctx.fillRect(0, 0, this._canvas.width, this._canvas.height);
@@ -164,7 +163,6 @@ export class RouletteRenderer {
     this.ctx.restore();
     this.onAfterScene();
 
-    uiObjects.forEach((obj) => obj.render(this.ctx, renderParameters, this._canvas.width, this._canvas.height));
     renderParameters.particleManager.render(this.ctx);
     this.renderWinner(renderParameters);
   }
