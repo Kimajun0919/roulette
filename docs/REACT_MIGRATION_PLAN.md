@@ -1,77 +1,39 @@
-# React(Vite) 리팩토링 단계별 계획
+# React(Vite) 리팩토링 진행 현황
 
-## 최종 목표
+## 목표
 1. 프로젝트 전체를 React + Vite 구조로 전환
-2. Figma MCP 연동으로 UI 수정 워크플로우 구축
-3. 기존 백엔드(추첨 데이터 관련)와 안정적으로 연결
+2. Figma MCP 연동 가능한 컴포넌트 구조로 정리
+3. API 모드(Haneulbit)와 로컬 모드를 공존시키되, 기본 동작은 안정 유지
 
 ---
 
-## Phase 1 (완료)
-- React + Vite 공존 골격 추가
-- 레거시 Roulette 엔진을 React에서 부팅 가능한 어댑터 추가
-- 명령어 추가: `dev:react`, `build:react`, `preview:react`
-
-산출물:
-- `react.html`
-- `vite.react.config.ts`
-- `src-react/*`
-
----
-
-## Phase 2 (완료)
-- `index.html`의 inline script 로직을 React 컴포넌트로 분리
-  - [x] 입력 패널(이름 입력 + 셔플)
-  - [x] 당첨 순위/옵션 패널(첫번째/마지막/직접입력, 속도, 자동녹화, 스킬사용)
-  - [x] 실행/결과 패널(시작/리셋, goal 이벤트 표시)
-  - [x] 맵/테마/엔진 메시지 패널 이관
-- 기존 `window.roulette/window.options` 의존 제거
-  - [x] React 어댑터(`legacyEngine`)로 직접 접근 통로 통일
-  - [x] 루트 엔트리 React 전환으로 inline window 제어 제거
+## 완료된 항목
+- 루트 엔트리 `index.html`를 React로 전환
+- Canvas 엔진을 React 컴포넌트 내부(Canvas Host)에서 mount 하도록 변경
+- 기존 inline script 기반 UI 로직을 React 컴포넌트로 이관
+  - 참가자 입력/셔플
+  - 당첨 옵션(첫번째/마지막/직접입력)
+  - 속도/자동녹화/스킬사용
+  - 맵/테마
+  - 실행/리셋/당첨 결과/엔진 메시지
+- 엔진 접근 통로를 `RouletteEngineAdapter`로 일원화
+- API 모드 추가(Haneulbit)
+  - super_admin 권한 확인
+  - 승인된 참석 인증 횟수 집계
+  - `이름*횟수` 형태로 룰렛 가중치 자동 반영
+- Parcel 기반 legacy dev/build 스크립트 제거 (React 단일 빌드 체계)
 
 ---
 
-## Phase 3 (진행중)
-- 상태 관리 구조화
-  - [x] React 상태 기반으로 핵심 실행 플로우 유지
-  - [ ] `useReducer` or Zustand로 단일 스토어 통합
-- 이벤트/엔진 브릿지 정리
-  - [x] `RouletteEngineAdapter` 도입 (엔진 접근 통로 일원화)
-  - [x] goal 이벤트를 React 상태로 연결
-  - [x] canvas mount 위치를 React DOM 노드로 이관
-- 추가 이관
-  - [x] 맵 선택 / 테마 선택 / 자동녹화 옵션 React UI 반영
-  - [ ] 기타 고급 옵션/패널 이관 완료
+## 진행중(마무리)
+- 상태관리 단일화 (`useReducer` or store)
+- API 모드 에러 메시지/복구 UX 고도화
+- Figma MCP 연동 대비 컴포넌트 세분화
 
 ---
 
-## Phase 4 (진행중)
-- 백엔드 연동 계층 추가
-  - [x] `src-react/api/*` API 클라이언트 스캐폴드 생성
-  - [x] React 화면에서 list/create 호출 연결 (DataSyncCard)
-  - [ ] 추첨 데이터 API를 실제 백엔드 스펙(경로/필드)으로 확정 연결
-- 실패/재시도/로딩 상태 표준화
-  - [x] 기본 상태 메시지/오류 표시
-  - [ ] 공통 에러 핸들러/토스트 체계 적용
-
----
-
-## Phase 5
-- Figma MCP 연동
-  - 디자인 토큰 동기화
-  - 주요 화면 컴포넌트 매핑
-  - UI 수정 프로세스(디자인->코드 반영) 정착
-
----
-
-## Phase 6
-- Parcel 제거
-- React 빌드 파이프라인으로 완전 전환
-- 회귀 테스트 + 성능 점검 + 배포 스크립트 정리
-
----
-
-## 체크포인트(매 단계 공통)
-- 레거시 기능 동등성(당첨 로직/물리 동작)
-- 성능(FPS, 렌더 지연)
-- 다국어/테마/녹화 기능 유지 여부
+## 검증 체크리스트
+- `npm run build` 성공
+- Local 모드 추첨 정상
+- API 모드(super_admin) 데이터 로드 및 가중치 반영 정상
+- 모드 전환 시 기존 기능 회귀 없음

@@ -4,15 +4,11 @@
   "license": "MIT",
   "devDependencies": {
     "@biomejs/biome": "2.4.4",
-    "@parcel/packager-raw-url": "^2.16.4",
-    "@parcel/transformer-sass": "^2.16.4",
-    "@parcel/transformer-webmanifest": "^2.16.4",
     "@types/gsap": "^3.0.0",
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",
     "@vitejs/plugin-react": "^4.3.4",
     "gsap": "^3.14.1",
-    "parcel": "^2.16.4",
     "path-browserify": "^1.0.0",
     "process": "^0.11.10",
     "svgo": "^3",
@@ -21,15 +17,10 @@
     "workbox-build": "7.4.0"
   },
   "scripts": {
-    "lint": "biome check --fix src/",
+    "lint": "biome check --fix src/ src-react/",
     "dev": "vite --config vite.react.config.ts --port 1236",
     "build": "vite build --config vite.react.config.ts",
-    "preview": "vite preview --config vite.react.config.ts --port 4174",
-    "dev:legacy": "./node_modules/.bin/parcel legacy.index.html --port 1235",
-    "build:legacy": "./node_modules/.bin/parcel build legacy.index.html --public-url /roulette/ && node scripts/build-sw.js",
-    "dev:react": "vite --config vite.react.config.ts --port 1236",
-    "build:react": "vite build --config vite.react.config.ts",
-    "preview:react": "vite preview --config vite.react.config.ts --port 4174"
+    "preview": "vite preview --config vite.react.config.ts --port 4174"
   },
   "dependencies": {
     "box2d-wasm": "^7.0.0",
