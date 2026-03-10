@@ -19,3 +19,6 @@ label { font-size: 14px; color: #d1d5db; }
 .muted { color: #9ca3af; font-size: 14px; }
 .canvas-host { width: 100%; min-height: 420px; border: 1px dashed #4b5563; border-radius: 10px; overflow: hidden; background: #000; }
 .canvas-host canvas { display: block; width: 100%; height: auto; }
+.ranking-list { list-style: none; padding: 0; margin: 0; display: grid; gap: 6px; }
+.ranking-list li { display: grid; grid-template-columns: 60px 1fr 24px; gap: 8px; padding: 6px 8px; border-radius: 8px; background: #111827; }
+.ranking-list li.target { outline: 1px solid #f59e0b; }

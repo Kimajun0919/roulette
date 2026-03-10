@@ -79,6 +79,10 @@ export class RouletteEngineAdapter {
     this.roulette.setMap(index);
   }
 
+  getRankingSnapshot() {
+    return this.roulette.getRankingSnapshot();
+  }
+
   getThemeNames() {
     return Object.keys(Themes);
   }

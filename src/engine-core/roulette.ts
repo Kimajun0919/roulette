@@ -8,7 +8,6 @@ import { Marble } from './marble';
 import { Minimap } from './minimap';
 import { ParticleManager } from './particleManager';
 import { Box2dPhysics } from './physics-box2d';
-import { RankRenderer } from './rankRenderer';
 import { RouletteRenderer } from './rouletteRenderer';
 import { SkillEffect } from './skillEffect';
 import type { ColorTheme } from './types/ColorTheme';
@@ -233,7 +232,6 @@ export class Roulette extends EventTarget {
     this.physics = new Box2dPhysics();
     await this.physics.init();
 
-    this.addUiObject(new RankRenderer());
     this.attachEvent();
     const minimap = new Minimap();
     minimap.onViewportChange((pos) => {
@@ -444,6 +442,22 @@ export class Roulette extends EventTarget {
         title: stage.title,
       };
     });
+  }
+
+  public getRankingSnapshot() {
+    const winners = this._winners.map((marble, index) => ({
+      rank: index + 1,
+      name: marble.name,
+      isTarget: index === this._winnerRank,
+    }));
+
+    const pending = this._marbles.map((marble, index) => ({
+      rank: winners.length + index + 1,
+      name: marble.name,
+      isTarget: winners.length + index === this._winnerRank,
+    }));
+
+    return [...winners, ...pending];
   }
 
   public setMap(index: number) {

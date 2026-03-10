@@ -13,16 +13,7 @@ export function App() {
   const [canvasHostEl, setCanvasHostEl] = useState<HTMLDivElement | null>(null);
   const { state, dispatch, names, winnerRank, shuffleNames, loadFromAttendanceApi } = useRouletteUi();
 
-  const {
-    engineReady,
-    goalWinner,
-    lastMessage,
-    maps,
-    themes,
-    start,
-    reset,
-    setMap,
-  } = useRouletteEngine({
+  const { engineReady, goalWinner, lastMessage, maps, themes, ranking, start, reset, setMap } = useRouletteEngine({
     mountElement: canvasHostEl,
     names,
     winnerRank,
@@ -91,6 +82,22 @@ export function App() {
         onStart={start}
         onReset={reset}
       />
+      <section className="card">
+        <h2>순위 (React UI)</h2>
+        {ranking.length === 0 ? (
+          <p className="muted">아직 데이터 없음</p>
+        ) : (
+          <ol className="ranking-list">
+            {ranking.slice(0, 20).map((item) => (
+              <li key={`${item.rank}-${item.name}`} className={item.isTarget ? 'target' : ''}>
+                <span>#{item.rank}</span>
+                <span>{item.name}</span>
+                <span>{item.isTarget ? '⭐' : ''}</span>
+              </li>
+            ))}
+          </ol>
+        )}
+      </section>
       <section className="card">
         <h2>엔진 메시지</h2>
         <p className="muted">{lastMessage ?? '아직 메시지 없음'}</p>

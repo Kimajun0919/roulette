@@ -14,6 +14,12 @@ type Params = {
   theme: string;
 };
 
+type RankingItem = {
+  rank: number;
+  name: string;
+  isTarget: boolean;
+};
+
 export function useRouletteEngine({
   mountElement,
   names,
@@ -30,6 +36,7 @@ export function useRouletteEngine({
   const [lastMessage, setLastMessage] = useState<string | null>(null);
   const [maps, setMaps] = useState<Array<{ index: number; title: string }>>([]);
   const [themes, setThemes] = useState<string[]>([]);
+  const [ranking, setRanking] = useState<RankingItem[]>([]);
 
   useEffect(() => {
     if (!mountElement || engine) return;
@@ -65,6 +72,15 @@ export function useRouletteEngine({
       offMessage();
     };
   }, [engine]);
+
+  useEffect(() => {
+    if (!engine || !engineReady) return;
+
+    const sync = () => setRanking(engine.getRankingSnapshot());
+    sync();
+    const timer = window.setInterval(sync, 100);
+    return () => window.clearInterval(timer);
+  }, [engine, engineReady]);
 
   useEffect(() => {
     if (!engine || !engineReady) return;
@@ -119,6 +135,7 @@ export function useRouletteEngine({
     lastMessage,
     maps,
     themes,
+    ranking,
     start,
     reset,
     setMap,
