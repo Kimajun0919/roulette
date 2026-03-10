@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { loadAttendanceWeights, type AttendanceWeight } from './api/haneulbit';
 import { ApiModeCard } from './components/ApiModeCard';
 import { DrawOptionsCard } from './components/DrawOptionsCard';
@@ -8,24 +8,17 @@ import { NextStepsCard } from './components/NextStepsCard';
 import { ParticipantsCard } from './components/ParticipantsCard';
 import { RunCard } from './components/RunCard';
 import type { WinnerType } from './engine/RouletteEngineAdapter';
-import type { RouletteEngineAdapter } from './engine/RouletteEngineAdapter';
-import { createEngine } from './legacyEngine';
+import { useRouletteEngine } from './engine/useRouletteEngine';
 
 export function App() {
-  const canvasHostRef = useRef<HTMLDivElement | null>(null);
-  const [engine, setEngine] = useState<RouletteEngineAdapter | null>(null);
-  const [engineReady, setEngineReady] = useState(false);
+  const [canvasHostEl, setCanvasHostEl] = useState<HTMLDivElement | null>(null);
   const [namesInput, setNamesInput] = useState('');
   const [winnerType, setWinnerType] = useState<WinnerType>('first');
   const [winnerRankInput, setWinnerRankInput] = useState(1);
   const [speed, setSpeed] = useState(1);
-  const [goalWinner, setGoalWinner] = useState<string | null>(null);
   const [autoRecording, setAutoRecording] = useState(true);
   const [useSkills, setUseSkills] = useState(true);
-  const [lastMessage, setLastMessage] = useState<string | null>(null);
-  const [maps, setMaps] = useState<Array<{ index: number; title: string }>>([]);
   const [selectedMap, setSelectedMap] = useState(0);
-  const [themes, setThemes] = useState<string[]>([]);
   const [theme, setTheme] = useState('dark');
   const [mode, setMode] = useState<'local' | 'api'>('local');
   const [apiBaseUrl, setApiBaseUrl] = useState(
@@ -44,83 +37,29 @@ export function App() {
     return Math.max(1, winnerRankInput);
   }, [winnerRankInput, winnerType, names.length]);
 
-  useEffect(() => {
-    if (!canvasHostRef.current || engine) return;
-    const mountedEngine = createEngine(canvasHostRef.current);
-    setEngine(mountedEngine);
-  }, [engine]);
-
-  useEffect(() => {
-    if (!engine) return;
-    const checkReady = () => {
-      if (engine.isReady) {
-        setEngineReady(true);
-        setMaps(engine.getMaps());
-        setThemes(engine.getThemeNames());
-        return true;
-      }
-      return false;
-    };
-
-    if (!checkReady()) {
-      const timer = window.setInterval(() => {
-        if (checkReady()) window.clearInterval(timer);
-      }, 100);
-      return () => window.clearInterval(timer);
-    }
-  }, [engine]);
-
-  useEffect(() => {
-    if (!engine) return;
-    const offGoal = engine.onGoal((winner) => setGoalWinner(winner));
-    const offMessage = engine.onMessage((msg) => setLastMessage(msg));
-    return () => {
-      offGoal();
-      offMessage();
-    };
-  }, [engine]);
-
-  useEffect(() => {
-    if (!engine || !engineReady) return;
-    engine.setNames(names);
-    engine.setWinnerRank(winnerRank, winnerType, names.length);
-  }, [engine, engineReady, names, winnerRank, winnerType]);
-
-  useEffect(() => {
-    if (!engine || !engineReady) return;
-    engine.setAutoRecording(autoRecording);
-  }, [engine, engineReady, autoRecording]);
-
-  useEffect(() => {
-    if (!engine || !engineReady) return;
-    engine.setTheme(theme);
-  }, [engine, engineReady, theme]);
-
-  useEffect(() => {
-    if (!engine || !engineReady) return;
-    engine.setUseSkills(useSkills);
-  }, [engine, engineReady, useSkills]);
-
-  const onStart = () => {
-    if (!engine || !engineReady) return;
-    setGoalWinner(null);
-    engine.setWinnerRank(winnerRank, winnerType, names.length);
-    engine.start();
-  };
-
-  const onReset = () => {
-    if (!engine || !engineReady) return;
-    setGoalWinner(null);
-    engine.reset(names);
-    engine.setWinnerRank(winnerRank, winnerType, names.length);
-  };
+  const {
+    engineReady,
+    goalWinner,
+    lastMessage,
+    maps,
+    themes,
+    start,
+    reset,
+    setMap,
+  } = useRouletteEngine({
+    mountElement: canvasHostEl,
+    names,
+    winnerRank,
+    winnerType,
+    speed,
+    autoRecording,
+    useSkills,
+    theme,
+  });
 
   const onMapChange = (index: number) => {
     setSelectedMap(index);
-    if (!engine || !engineReady) return;
-    engine.setMap(index);
-    engine.setNames(names);
-    engine.setWinnerRank(winnerRank, winnerType, names.length);
+    setMap(index);
   };
 
   const loadFromAttendanceApi = async () => {
@@ -172,10 +111,7 @@ export function App() {
         useSkills={useSkills}
         onWinnerTypeChange={setWinnerType}
         onWinnerRankInputChange={setWinnerRankInput}
-        onSpeedChange={(next) => {
-          setSpeed(next);
-          if (engine && engineReady) engine.setSpeed(next);
-        }}
+        onSpeedChange={setSpeed}
         onAutoRecordingChange={setAutoRecording}
         onUseSkillsChange={setUseSkills}
       />
@@ -193,8 +129,8 @@ export function App() {
         namesCount={names.length}
         winnerRank={winnerRank}
         goalWinner={goalWinner}
-        onStart={onStart}
-        onReset={onReset}
+        onStart={start}
+        onReset={reset}
       />
       <section className="card">
         <h2>엔진 메시지</h2>
@@ -202,7 +138,7 @@ export function App() {
       </section>
       <section className="card">
         <h2>Canvas Host (React mount)</h2>
-        <div ref={canvasHostRef} className="canvas-host" />
+        <div ref={setCanvasHostEl} className="canvas-host" />
       </section>
       {/* data sync card removed: replaced by API mode card */}
       <NextStepsCard />
