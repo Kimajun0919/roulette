@@ -43,9 +43,17 @@ textarea {
 .canvas-host {
   position: fixed;
   inset: 0;
+  overflow: hidden;
 }
 
-canvas {
+.stage-overlay-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 400;
+  pointer-events: none;
+}
+
+.canvas-host canvas {
   position: fixed;
   inset: 0;
   width: 100%;
@@ -575,10 +583,9 @@ div.toast {
 }
 
 .minimap-overlay {
-  position: fixed;
+  position: absolute;
   top: 10px;
   left: 10px;
-  z-index: 500;
   width: 104px;
   border: 1px solid green;
   pointer-events: auto;
@@ -591,10 +598,9 @@ div.toast {
 }
 
 .ranking-overlay {
-  position: fixed;
+  position: absolute;
   top: 0;
   right: 0;
-  z-index: 500;
   width: 165px;
   padding: 4px 10px 10px;
   pointer-events: auto;
@@ -632,10 +638,9 @@ div.toast {
 }
 
 .winner-overlay {
-  position: fixed;
+  position: absolute;
   right: 0;
   bottom: 0;
-  z-index: 550;
   width: min(50vw, 760px);
   padding: 24px 20px 20px;
   background: var(--winner-bg);
@@ -687,10 +692,9 @@ div.toast {
 }
 
 .fast-forward-overlay {
-  position: fixed;
+  position: absolute;
   top: 25%;
   left: 25%;
-  z-index: 450;
   display: grid;
   width: 50%;
   height: 50%;
@@ -698,6 +702,7 @@ div.toast {
   background: transparent;
   color: white;
   cursor: pointer;
+  pointer-events: auto;
 }
 
 .fast-forward-overlay .icon {

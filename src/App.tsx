@@ -104,19 +104,20 @@ export function App() {
     <main className="app-shell">
       <div className="canvas-host">
         <canvas ref={setCanvasEl} />
+        <div className="stage-overlay-layer">
+          <MinimapCard snapshot={uiSnapshot} onHoverViewport={setCameraViewportPosition} />
+          <RankingOverlay ranking={ranking} themeName={state.theme} />
+          <WinnerSpotlightCard
+            winner={winnerInfo}
+            winnerRank={winnerRank}
+            winnersCount={winnersCount}
+            totalCount={ranking.length}
+            recordingDownload={recordingDownload}
+            themeName={state.theme}
+          />
+          <FastForwardOverlay engineReady={engineReady} onChange={setFastForwardEnabled} />
+        </div>
       </div>
-
-      <MinimapCard snapshot={uiSnapshot} onHoverViewport={setCameraViewportPosition} />
-      <RankingOverlay ranking={ranking} themeName={state.theme} />
-      <WinnerSpotlightCard
-        winner={winnerInfo}
-        winnerRank={winnerRank}
-        winnersCount={winnersCount}
-        totalCount={ranking.length}
-        recordingDownload={recordingDownload}
-        themeName={state.theme}
-      />
-      <FastForwardOverlay engineReady={engineReady} onChange={setFastForwardEnabled} />
 
       <div id="settings" className={settingsHidden ? 'hide' : ''}>
         <div className="right">
