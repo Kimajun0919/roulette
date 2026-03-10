@@ -40,14 +40,13 @@ export class RouletteEngineAdapter {
   }
 
   setWinnerRank(rankOneBased: number, winnerType: WinnerType, totalCount: number) {
-    if (winnerType === 'first') {
-      options.winningRank = 0;
-    } else if (winnerType === 'last') {
-      options.winningRank = Math.max(0, totalCount - 1);
-    } else {
-      options.winningRank = Math.max(0, rankOneBased - 1);
-    }
-    this.roulette.setWinningRank(options.winningRank);
+    const rankZeroBased =
+      winnerType === 'first'
+        ? 0
+        : winnerType === 'last'
+          ? Math.max(0, totalCount - 1)
+          : Math.max(0, rankOneBased - 1);
+    this.roulette.setWinningRank(rankZeroBased);
   }
 
   setSpeed(speed: number) {
@@ -55,7 +54,6 @@ export class RouletteEngineAdapter {
   }
 
   setAutoRecording(enabled: boolean) {
-    options.autoRecording = enabled;
     this.roulette.setAutoRecording(enabled);
   }
 
@@ -69,7 +67,6 @@ export class RouletteEngineAdapter {
 
   reset(names: string[]) {
     this.roulette.setMarbles(names);
-    this.roulette.setWinningRank(options.winningRank);
   }
 
   getCount() {
