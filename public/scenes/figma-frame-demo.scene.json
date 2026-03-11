@@ -1,0 +1,205 @@
+{
+  "id": "1:200",
+  "name": "Figma Frame Demo",
+  "type": "FRAME",
+  "absoluteBoundingBox": {
+    "x": 0,
+    "y": 0,
+    "width": 2600,
+    "height": 7600
+  },
+  "children": [
+    {
+      "id": "1:201",
+      "name": "anchors",
+      "type": "GROUP",
+      "children": [
+        {
+          "id": "1:202",
+          "name": "goal-y",
+          "type": "RECTANGLE",
+          "absoluteBoundingBox": { "x": 1250, "y": 7100, "width": 100, "height": 40 }
+        },
+        {
+          "id": "1:203",
+          "name": "zoom-y",
+          "type": "RECTANGLE",
+          "absoluteBoundingBox": { "x": 1250, "y": 6200, "width": 100, "height": 40 }
+        },
+        {
+          "id": "1:204",
+          "name": "spawn-center",
+          "type": "ELLIPSE",
+          "absoluteBoundingBox": { "x": 1250, "y": 280, "width": 100, "height": 100 }
+        },
+        {
+          "id": "1:205",
+          "name": "camera-start",
+          "type": "ELLIPSE",
+          "absoluteBoundingBox": { "x": 1250, "y": 420, "width": 100, "height": 100 }
+        }
+      ]
+    },
+    {
+      "id": "1:210",
+      "name": "physics",
+      "type": "GROUP",
+      "children": [
+        {
+          "id": "1:211",
+          "name": "wall-left | body=static",
+          "type": "VECTOR",
+          "points": [
+            { "x": 420, "y": -3000 },
+            { "x": 420, "y": 1100 },
+            { "x": 620, "y": 1900 },
+            { "x": 800, "y": 2800 },
+            { "x": 760, "y": 3800 },
+            { "x": 960, "y": 4800 },
+            { "x": 920, "y": 5900 },
+            { "x": 1160, "y": 6850 }
+          ],
+          "absoluteBoundingBox": { "x": 420, "y": -3000, "width": 740, "height": 9850 }
+        },
+        {
+          "id": "1:212",
+          "name": "wall-right | body=static",
+          "type": "VECTOR",
+          "points": [
+            { "x": 2180, "y": -3000 },
+            { "x": 2180, "y": 1100 },
+            { "x": 1980, "y": 1900 },
+            { "x": 1800, "y": 2800 },
+            { "x": 1840, "y": 3800 },
+            { "x": 1640, "y": 4800 },
+            { "x": 1680, "y": 5900 },
+            { "x": 1440, "y": 6850 }
+          ],
+          "absoluteBoundingBox": { "x": 1440, "y": -3000, "width": 740, "height": 9850 }
+        },
+        {
+          "id": "1:213",
+          "name": "peg-a | body=static | restitution=1",
+          "type": "ELLIPSE",
+          "absoluteBoundingBox": { "x": 850, "y": 1800, "width": 70, "height": 70 },
+          "fills": [{ "type": "SOLID", "color": { "r": 0.83, "g": 0.88, "b": 0.42 } }]
+        },
+        {
+          "id": "1:214",
+          "name": "peg-b | body=static | restitution=1",
+          "type": "ELLIPSE",
+          "absoluteBoundingBox": { "x": 1265, "y": 2100, "width": 70, "height": 70 },
+          "fills": [{ "type": "SOLID", "color": { "r": 0.83, "g": 0.88, "b": 0.42 } }]
+        },
+        {
+          "id": "1:215",
+          "name": "peg-c | body=static | restitution=1",
+          "type": "ELLIPSE",
+          "absoluteBoundingBox": { "x": 1680, "y": 1800, "width": 70, "height": 70 },
+          "fills": [{ "type": "SOLID", "color": { "r": 0.83, "g": 0.88, "b": 0.42 } }]
+        },
+        {
+          "id": "1:216",
+          "name": "rotor-left | body=kinematic | angularVelocity=2.4",
+          "type": "RECTANGLE",
+          "absoluteBoundingBox": { "x": 650, "y": 4850, "width": 460, "height": 24 },
+          "fills": [{ "type": "SOLID", "color": { "r": 0.56, "g": 0.79, "b": 0.9 } }]
+        },
+        {
+          "id": "1:217",
+          "name": "rotor-right | body=kinematic | angularVelocity=-2.4",
+          "type": "RECTANGLE",
+          "absoluteBoundingBox": { "x": 1490, "y": 4850, "width": 460, "height": 24 },
+          "fills": [{ "type": "SOLID", "color": { "r": 0.56, "g": 0.79, "b": 0.9 } }]
+        }
+      ]
+    },
+    {
+      "id": "1:220",
+      "name": "visuals",
+      "type": "GROUP",
+      "children": [
+        {
+          "id": "1:221",
+          "name": "Background Panel | zIndex=-30",
+          "type": "RECTANGLE",
+          "absoluteBoundingBox": { "x": 180, "y": 900, "width": 2240, "height": 5200 },
+          "cornerRadius": 48,
+          "fills": [
+            {
+              "type": "GRADIENT_LINEAR",
+              "gradientHandlePositions": [
+                { "x": 0, "y": 0 },
+                { "x": 1, "y": 1 }
+              ],
+              "gradientStops": [
+                { "position": 0, "color": { "r": 0.05, "g": 0.11, "b": 0.18, "a": 0.18 } },
+                { "position": 1, "color": { "r": 0.07, "g": 0.2, "b": 0.28, "a": 0.42 } }
+              ]
+            }
+          ],
+          "strokes": [
+            {
+              "type": "SOLID",
+              "color": { "r": 0.58, "g": 0.79, "b": 0.9, "a": 0.65 }
+            }
+          ],
+          "strokeWeight": 10
+        },
+        {
+          "id": "1:222",
+          "name": "Top Title | zIndex=-20",
+          "type": "TEXT",
+          "absoluteBoundingBox": { "x": 650, "y": 320, "width": 1300, "height": 140 },
+          "characters": "Imported From Raw Figma Frame JSON",
+          "fontSize": 88,
+          "textAlignHorizontal": "CENTER",
+          "fontName": { "family": "Arial", "style": "Bold" },
+          "fills": [
+            {
+              "type": "SOLID",
+              "color": { "r": 0.75, "g": 0.88, "b": 0.99, "a": 0.95 }
+            }
+          ]
+        },
+        {
+          "id": "1:223",
+          "name": "HUD Tag | layer=screen | zIndex=10",
+          "type": "TEXT",
+          "absoluteBoundingBox": { "x": 920, "y": 120, "width": 760, "height": 100 },
+          "characters": "screen layer label",
+          "fontSize": 54,
+          "textAlignHorizontal": "CENTER",
+          "fontName": { "family": "Arial", "style": "Regular" },
+          "fills": [
+            {
+              "type": "SOLID",
+              "color": { "r": 1, "g": 1, "b": 1, "a": 0.78 }
+            }
+          ]
+        },
+        {
+          "id": "1:224",
+          "name": "Goal Glow | zIndex=-15",
+          "type": "RECTANGLE",
+          "absoluteBoundingBox": { "x": 740, "y": 6630, "width": 1120, "height": 460 },
+          "cornerRadius": 32,
+          "fills": [
+            {
+              "type": "GRADIENT_LINEAR",
+              "gradientHandlePositions": [
+                { "x": 0, "y": 0.5 },
+                { "x": 1, "y": 0.5 }
+              ],
+              "gradientStops": [
+                { "position": 0, "color": { "r": 1, "g": 0.72, "b": 0.16, "a": 0.12 } },
+                { "position": 0.5, "color": { "r": 1, "g": 0.79, "b": 0.22, "a": 0.26 } },
+                { "position": 1, "color": { "r": 1, "g": 0.72, "b": 0.16, "a": 0.12 } }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

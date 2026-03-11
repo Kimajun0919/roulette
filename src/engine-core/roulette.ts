@@ -211,6 +211,52 @@ export class Roulette extends EventTarget {
     this._effects = this._effects.filter((effect) => !effect.isDestroy);
   }
 
+  private _getDefaultCameraStart() {
+    return { x: 12.95, y: 2, zoom: 1 };
+  }
+
+  private _applySceneCameraStart() {
+    const cameraStart = this._stage?.anchors.cameraStart ?? this._getDefaultCameraStart();
+    this._camera.initializePosition({ x: cameraStart.x, y: cameraStart.y }, cameraStart.zoom);
+  }
+
+  private _getSpawnPosition(order: number, totalCount: number) {
+    if (!this._stage?.anchors.spawnCenter) {
+      const maxLine = Math.ceil(totalCount / 10);
+      const line = Math.floor(order / 10);
+      const lineDelta = -Math.max(0, Math.ceil(maxLine - 5));
+      return {
+        x: 10.25 + (order % 10) * 0.6,
+        y: maxLine - line + lineDelta,
+      };
+    }
+
+    const columns = Math.min(totalCount, 10);
+    const row = Math.floor(order / 10);
+    const col = order % 10;
+    const rows = Math.ceil(totalCount / 10);
+    const center = this._stage.anchors.spawnCenter;
+
+    return {
+      x: center.x + (col - (columns - 1) / 2) * 0.6,
+      y: center.y + ((rows - 1) / 2 - row),
+    };
+  }
+
+  private _getSpawnCameraCenter(totalCount: number) {
+    if (!this._stage?.anchors.spawnCenter) {
+      const cols = Math.min(totalCount, 10);
+      const rows = Math.ceil(totalCount / 10);
+      const lineDelta = -Math.max(0, Math.ceil(rows - 5));
+      return {
+        x: 10.25 + (cols - 1) * 0.3,
+        y: (1 + rows) / 2 + lineDelta,
+      };
+    }
+
+    return this._stage.anchors.spawnCenter;
+  }
+
   private _render() {
     if (!this._stage) return;
     const renderParams = {
@@ -252,7 +298,7 @@ export class Roulette extends EventTarget {
     }
 
     this.physics.createStage(this._stage);
-    this._camera.initializePosition();
+    this._applySceneCameraStart();
   }
 
   public clearMarbles() {
@@ -340,7 +386,7 @@ export class Roulette extends EventTarget {
       if (member) {
         for (let j = 0; j < member.count; j++) {
           const order = orders.pop() || 0;
-          this._marbles.push(new Marble(this.physics, order, totalCount, member.name, member.weight));
+          this._marbles.push(new Marble(this.physics, order, totalCount, member.name, member.weight, this._getSpawnPosition(order, totalCount)));
         }
       }
     });
@@ -350,9 +396,7 @@ export class Roulette extends EventTarget {
     if (totalCount > 0) {
       const cols = Math.min(totalCount, 10);
       const rows = Math.ceil(totalCount / 10);
-      const lineDelta = -Math.max(0, Math.ceil(rows - 5));
-      const centerX = 10.25 + (cols - 1) * 0.3;
-      const centerY = (1 + rows) / 2 + lineDelta;
+      const spawnCenter = this._getSpawnCameraCenter(totalCount);
 
       const spawnWidth = Math.max((cols - 1) * 0.6, 1);
       const spawnHeight = Math.max(rows - 1, 1);
@@ -364,7 +408,7 @@ export class Roulette extends EventTarget {
         Math.min(Math.min(viewW / (spawnWidth + margin * 2), viewH / (spawnHeight + margin * 2)), 3)
       );
 
-      this._camera.initializePosition({ x: centerX, y: centerY }, zoom);
+      this._camera.initializePosition({ x: spawnCenter.x, y: spawnCenter.y }, zoom);
     }
   }
 
@@ -418,7 +462,6 @@ export class Roulette extends EventTarget {
     this._stage = scene;
     this._sceneId = scene.id;
     this.setMarbles(names);
-    this._camera.initializePosition();
   }
 
   public setMap(index: number) {

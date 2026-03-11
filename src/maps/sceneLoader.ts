@@ -1,5 +1,5 @@
 import { externalSceneUrls } from './externalSceneManifest';
-import { importFigmaFrameToScene, isFigmaFrameNode } from './importers/figmaSceneImporter';
+import { importFigmaFrameToScene, isFigmaFrameImportPayload, isFigmaFrameNode } from './importers/figmaSceneImporter';
 import { scenes as legacyScenes } from './scenes';
 import type { SceneCatalog, SceneDef, SceneOption } from './sceneSchema';
 
@@ -86,10 +86,24 @@ export async function loadSceneFromUrl(url: string): Promise<SceneDef> {
   const raw = await response.json();
   const fallbackId = slugifySceneId(titleFromUrl(url)) || 'external-scene';
 
+  if (isFigmaFrameImportPayload(raw)) {
+    const frame = raw.frame ?? raw.figmaFrame;
+    if (!frame) {
+      throw new Error(`Invalid Figma frame payload from ${url}`);
+    }
+
+    return importFigmaFrameToScene(frame, {
+      sceneId: raw.sceneId ?? fallbackId,
+      sceneTitle: raw.sceneTitle,
+      pxPerUnit: raw.pxPerUnit,
+      imageUrls: raw.imageUrls ?? raw.images,
+      source: 'figma',
+    });
+  }
+
   if (isFigmaFrameNode(raw)) {
     return importFigmaFrameToScene(raw, {
       sceneId: fallbackId,
-      sceneTitle: titleFromUrl(url),
       source: 'figma',
     });
   }

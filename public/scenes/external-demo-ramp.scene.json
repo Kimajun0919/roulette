@@ -130,8 +130,56 @@
     }
   ],
   "visuals": [
-    { "id": "bg", "name": "Backdrop Gradient", "kind": "shape" },
-    { "id": "title-mark", "name": "External Demo Mark", "kind": "text" }
+    {
+      "id": "bg-panel",
+      "name": "Background Panel",
+      "kind": "shape",
+      "shape": "rect",
+      "x": 13,
+      "y": 22,
+      "width": 23,
+      "height": 28,
+      "fill": "rgba(13, 27, 42, 0.3)",
+      "stroke": "rgba(142, 202, 230, 0.6)",
+      "strokeWidth": 0.08,
+      "zIndex": -20
+    },
+    {
+      "id": "title-mark",
+      "name": "External Demo Mark",
+      "kind": "text",
+      "text": "External Demo Ramp",
+      "x": 13,
+      "y": 7,
+      "fontSize": 1.1,
+      "color": "rgba(189, 224, 254, 0.95)",
+      "zIndex": -10
+    },
+    {
+      "id": "sub-copy",
+      "name": "Scene Source Label",
+      "kind": "text",
+      "text": "Loaded from public/scenes JSON",
+      "x": 13,
+      "y": 9.2,
+      "fontSize": 0.48,
+      "color": "rgba(255, 255, 255, 0.72)",
+      "zIndex": -10
+    },
+    {
+      "id": "goal-band",
+      "name": "Goal Band",
+      "kind": "shape",
+      "shape": "rect",
+      "x": 13,
+      "y": 67.5,
+      "width": 12,
+      "height": 4,
+      "fill": "rgba(255, 183, 3, 0.16)",
+      "stroke": "rgba(255, 183, 3, 0.45)",
+      "strokeWidth": 0.06,
+      "zIndex": -5
+    }
   ],
   "source": "json"
 }

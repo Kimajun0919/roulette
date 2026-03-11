@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 320" fill="none">
+  <defs>
+    <linearGradient id="bg" x1="32" y1="24" x2="480" y2="296" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#1B263B"/>
+      <stop offset="1" stop-color="#415A77"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="92" y1="70" x2="420" y2="250" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#8ECAE6"/>
+      <stop offset="1" stop-color="#FFB703"/>
+    </linearGradient>
+  </defs>
+  <rect x="12" y="12" width="488" height="296" rx="40" fill="url(#bg)" stroke="#BDE0FE" stroke-width="8"/>
+  <path d="M92 222C144 144 206 106 278 106C334 106 382 130 420 174" stroke="#8ECAE6" stroke-width="16" stroke-linecap="round"/>
+  <circle cx="162" cy="142" r="26" fill="#C9F27B"/>
+  <circle cx="258" cy="172" r="28" fill="#F2C14E"/>
+  <circle cx="348" cy="142" r="26" fill="#FF8FAB"/>
+  <path d="M210 68H332L364 102L332 136H210L178 102L210 68Z" fill="url(#accent)"/>
+  <text x="256" y="106" fill="#0D1B2A" font-size="34" font-family="Arial, sans-serif" font-weight="700" text-anchor="middle">Figma Skin</text>
+  <text x="256" y="260" fill="#E0FBFC" font-size="26" font-family="Arial, sans-serif" text-anchor="middle">image paint demo</text>
+</svg>

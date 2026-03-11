@@ -8,6 +8,7 @@ import type { ParticleManager } from './particleManager';
 import type { ColorTheme } from './types/ColorTheme';
 import type { MapEntityState } from './types/MapEntity.type';
 import type { VectorLike } from './types/VectorLike';
+import type { SceneEffect, SceneLinearGradientPaint, ScenePaint, SceneVisualNode } from '../maps/sceneSchema';
 
 export type RenderParameters = {
   camera: Camera;
@@ -29,6 +30,7 @@ export class RouletteRenderer {
   public sizeFactor = 1;
 
   protected _images: { [key: string]: HTMLImageElement } = {};
+  protected _sceneImages = new Map<string, HTMLImageElement | Promise<HTMLImageElement>>();
   protected _theme: ColorTheme = Themes.dark;
   protected _keywordService: KeywordService;
   protected _mountElement: HTMLElement;
@@ -140,6 +142,28 @@ export class RouletteRenderer {
     return this._keywordService.getSprite(name);
   }
 
+  private getSceneImage(src: string): HTMLImageElement | undefined {
+    const cached = this._sceneImages.get(src);
+    if (cached instanceof HTMLImageElement) {
+      return cached;
+    }
+
+    if (!cached) {
+      const promise = this._loadImage(src)
+        .then((img) => {
+          this._sceneImages.set(src, img);
+          return img;
+        })
+        .catch(() => {
+          this._sceneImages.delete(src);
+          return null;
+        });
+      this._sceneImages.set(src, promise);
+    }
+
+    return undefined;
+  }
+
   protected onBeforeEntities(): void {}
   protected onAfterScene(): void {}
 
@@ -156,6 +180,7 @@ export class RouletteRenderer {
     this.ctx.lineWidth = 3 / (renderParameters.camera.zoom + initialZoom);
     renderParameters.camera.renderScene(this.ctx, () => {
       this.onBeforeEntities();
+      this.renderVisuals(renderParameters.stage.visuals);
       this.renderEntities(renderParameters.entities);
       this.renderEffects(renderParameters);
       this.renderMarbles(renderParameters);
@@ -163,7 +188,244 @@ export class RouletteRenderer {
     this.ctx.restore();
     this.onAfterScene();
 
+    this.ctx.save();
+    this.ctx.scale(initialZoom, initialZoom);
+    this.renderVisuals(renderParameters.stage.visuals, 'screen');
+    this.ctx.restore();
     renderParameters.particleManager.render(this.ctx);
+  }
+
+  private renderVisuals(visuals?: SceneVisualNode[], layer: 'world' | 'screen' = 'world') {
+    if (!visuals?.length) return;
+
+    const items = visuals
+      .filter((visual) => visual.visible !== false && (visual.layer ?? 'world') === layer)
+      .slice()
+      .sort((a, b) => (a.zIndex ?? 0) - (b.zIndex ?? 0));
+
+    if (!items.length) return;
+
+    this.ctx.save();
+    for (const visual of items) {
+      const transform = this.ctx.getTransform();
+      this.applyVisualEffects(visual.effects);
+      this.ctx.globalAlpha = visual.opacity ?? 1;
+      this.ctx.translate(visual.x ?? 0, visual.y ?? 0);
+      this.ctx.rotate(visual.rotation ?? 0);
+      this.ctx.scale(visual.scaleX ?? 1, visual.scaleY ?? 1);
+
+      switch (visual.kind) {
+        case 'shape':
+          this.renderShapeVisual(visual);
+          break;
+        case 'text':
+          this.renderTextVisual(visual);
+          break;
+        case 'image':
+          this.renderImageVisual(visual);
+          break;
+        case 'group':
+          break;
+      }
+
+      this.ctx.setTransform(transform);
+      this.ctx.globalAlpha = 1;
+      this.resetVisualEffects();
+    }
+    this.ctx.restore();
+  }
+
+  private renderShapeVisual(visual: Extract<SceneVisualNode, { kind: 'shape' }>) {
+    const bounds = this.getVisualBounds(visual);
+    const fill = this.resolvePaint(visual.fill, bounds) ?? 'transparent';
+    const stroke = this.resolvePaint(visual.stroke, bounds) ?? 'transparent';
+    const strokeWidth = visual.strokeWidth ?? 0;
+    this.ctx.fillStyle = fill;
+    this.ctx.strokeStyle = stroke;
+    this.ctx.lineWidth = strokeWidth;
+
+    switch (visual.shape) {
+      case 'rect': {
+        const width = visual.width ?? 0;
+        const height = visual.height ?? 0;
+        const x = -width / 2;
+        const y = -height / 2;
+        if (visual.cornerRadius && visual.cornerRadius > 0) {
+          this.ctx.beginPath();
+          this.ctx.roundRect(x, y, width, height, visual.cornerRadius);
+          if (fill !== 'transparent') this.ctx.fill();
+          if (strokeWidth > 0 && stroke !== 'transparent') this.ctx.stroke();
+        } else {
+          if (fill !== 'transparent') this.ctx.fillRect(x, y, width, height);
+          if (strokeWidth > 0 && stroke !== 'transparent') this.ctx.strokeRect(x, y, width, height);
+        }
+        break;
+      }
+      case 'circle': {
+        const radius = visual.radius ?? Math.min(visual.width ?? 0, visual.height ?? 0) / 2;
+        this.ctx.beginPath();
+        this.ctx.arc(0, 0, radius, 0, Math.PI * 2);
+        if (fill !== 'transparent') this.ctx.fill();
+        if (strokeWidth > 0 && stroke !== 'transparent') this.ctx.stroke();
+        break;
+      }
+      case 'polyline':
+        if (!visual.points?.length) break;
+        this.ctx.beginPath();
+        this.ctx.moveTo(visual.points[0][0], visual.points[0][1]);
+        for (let i = 1; i < visual.points.length; i++) {
+          this.ctx.lineTo(visual.points[i][0], visual.points[i][1]);
+        }
+        if (fill !== 'transparent') this.ctx.fill();
+        if (strokeWidth > 0 && stroke !== 'transparent') this.ctx.stroke();
+        break;
+      case 'path': {
+        if (!visual.pathData) break;
+        const path = new Path2D(visual.pathData);
+        if (fill !== 'transparent') this.ctx.fill(path);
+        if (strokeWidth > 0 && stroke !== 'transparent') this.ctx.stroke(path);
+        break;
+      }
+    }
+  }
+
+  private renderTextVisual(visual: Extract<SceneVisualNode, { kind: 'text' }>) {
+    this.ctx.font = `${visual.fontSize ?? 1}pt ${visual.fontFamily ?? 'sans-serif'}`;
+    this.ctx.fillStyle = visual.color ?? '#ffffff';
+    this.ctx.textAlign = visual.align ?? 'center';
+    this.ctx.textBaseline = 'middle';
+    this.ctx.fillText(visual.text, 0, 0);
+  }
+
+  private renderImageVisual(visual: Extract<SceneVisualNode, { kind: 'image' }>) {
+    const image = this.getSceneImage(visual.src);
+    if (!image) return;
+
+    const drawImage = () => {
+      this.ctx.drawImage(image, -(visual.width / 2), -(visual.height / 2), visual.width, visual.height);
+    };
+
+    if (visual.clipShape === 'circle') {
+      this.ctx.save();
+      this.ctx.beginPath();
+      this.ctx.arc(0, 0, Math.min(visual.width, visual.height) / 2, 0, Math.PI * 2);
+      this.ctx.clip();
+      drawImage();
+      this.ctx.restore();
+      return;
+    }
+
+    if (visual.clipShape === 'rect' && visual.cornerRadius && visual.cornerRadius > 0) {
+      this.ctx.save();
+      this.ctx.beginPath();
+      this.ctx.roundRect(-(visual.width / 2), -(visual.height / 2), visual.width, visual.height, visual.cornerRadius);
+      this.ctx.clip();
+      drawImage();
+      this.ctx.restore();
+      return;
+    }
+
+    drawImage();
+  }
+
+  private getVisualBounds(visual: Extract<SceneVisualNode, { kind: 'shape' }>) {
+    switch (visual.shape) {
+      case 'rect':
+        return {
+          x: -(visual.width ?? 0) / 2,
+          y: -(visual.height ?? 0) / 2,
+          width: visual.width ?? 0,
+          height: visual.height ?? 0,
+        };
+      case 'circle': {
+        const radius = visual.radius ?? Math.min(visual.width ?? 0, visual.height ?? 0) / 2;
+        return {
+          x: -radius,
+          y: -radius,
+          width: radius * 2,
+          height: radius * 2,
+        };
+      }
+      case 'polyline': {
+        const points = visual.points ?? [];
+        if (!points.length) {
+          return { x: 0, y: 0, width: 0, height: 0 };
+        }
+
+        const xs = points.map(([x]) => x);
+        const ys = points.map(([, y]) => y);
+        const minX = Math.min(...xs);
+        const minY = Math.min(...ys);
+        const maxX = Math.max(...xs);
+        const maxY = Math.max(...ys);
+        return {
+          x: minX,
+          y: minY,
+          width: maxX - minX,
+          height: maxY - minY,
+        };
+      }
+      case 'path':
+        return {
+          x: 0,
+          y: 0,
+          width: visual.width ?? 0,
+          height: visual.height ?? 0,
+        };
+    }
+  }
+
+  private resolvePaint(paint: ScenePaint | undefined, bounds: { x: number; y: number; width: number; height: number }) {
+    if (!paint) return undefined;
+    if (typeof paint === 'string') return paint;
+    return this.createLinearGradient(paint, bounds);
+  }
+
+  private createLinearGradient(
+    paint: SceneLinearGradientPaint,
+    bounds: { x: number; y: number; width: number; height: number }
+  ) {
+    const gradient = this.ctx.createLinearGradient(
+      bounds.x + bounds.width * paint.x0,
+      bounds.y + bounds.height * paint.y0,
+      bounds.x + bounds.width * paint.x1,
+      bounds.y + bounds.height * paint.y1
+    );
+
+    for (const stop of paint.stops) {
+      gradient.addColorStop(stop.offset, stop.color);
+    }
+
+    return gradient;
+  }
+
+  private applyVisualEffects(effects?: SceneEffect[]) {
+    if (!effects?.length) return;
+
+    let blurRadius = 0;
+    const shadow = effects.find((effect) => effect.type === 'drop-shadow');
+    const blur = effects.find((effect) => effect.type === 'layer-blur');
+
+    if (blur?.type === 'layer-blur') {
+      blurRadius = blur.radius * initialZoom;
+    }
+
+    this.ctx.filter = blurRadius > 0 ? `blur(${blurRadius}px)` : 'none';
+
+    if (shadow?.type === 'drop-shadow') {
+      this.ctx.shadowColor = shadow.color;
+      this.ctx.shadowBlur = shadow.blur * initialZoom;
+      this.ctx.shadowOffsetX = shadow.offsetX * initialZoom;
+      this.ctx.shadowOffsetY = shadow.offsetY * initialZoom;
+    }
+  }
+
+  private resetVisualEffects() {
+    this.ctx.filter = 'none';
+    this.ctx.shadowColor = 'transparent';
+    this.ctx.shadowBlur = 0;
+    this.ctx.shadowOffsetX = 0;
+    this.ctx.shadowOffsetY = 0;
   }
 
   private renderEntities(entities: MapEntityState[]) {
