@@ -6,7 +6,7 @@ import { KeywordService } from './keywordService';
 import type { Marble } from './marble';
 import type { ParticleManager } from './particleManager';
 import type { ColorTheme } from './types/ColorTheme';
-import type { MapEntityState } from './types/MapEntity.type';
+import type { EntityImageRender, MapEntityState } from './types/MapEntity.type';
 import type { VectorLike } from './types/VectorLike';
 import type {
   SceneClipNode,
@@ -37,6 +37,13 @@ export type RenderParameters = {
 type RenderSurface = {
   canvas: HTMLCanvasElement;
   ctx: CanvasRenderingContext2D;
+};
+
+type DrawImageFrame = {
+  width: number;
+  height: number;
+  clipShape?: 'rect' | 'circle';
+  cornerRadius?: number;
 };
 
 export class RouletteRenderer {
@@ -520,25 +527,25 @@ export class RouletteRenderer {
     ctx.fillText(visual.text, 0, 0);
   }
 
-  private drawImageShape(ctx: CanvasRenderingContext2D, visual: Extract<SceneVisualNode, { kind: 'image' }>, image: CanvasImageSource) {
+  private drawImageFrame(ctx: CanvasRenderingContext2D, frame: DrawImageFrame, image: CanvasImageSource) {
     const drawImage = () => {
-      ctx.drawImage(image, -(visual.width / 2), -(visual.height / 2), visual.width, visual.height);
+      ctx.drawImage(image, -(frame.width / 2), -(frame.height / 2), frame.width, frame.height);
     };
 
-    if (visual.clipShape === 'circle') {
+    if (frame.clipShape === 'circle') {
       ctx.save();
       ctx.beginPath();
-      ctx.arc(0, 0, Math.min(visual.width, visual.height) / 2, 0, Math.PI * 2);
+      ctx.arc(0, 0, Math.min(frame.width, frame.height) / 2, 0, Math.PI * 2);
       ctx.clip();
       drawImage();
       ctx.restore();
       return;
     }
 
-    if (visual.clipShape === 'rect' && visual.cornerRadius && visual.cornerRadius > 0) {
+    if (frame.clipShape === 'rect' && frame.cornerRadius && frame.cornerRadius > 0) {
       ctx.save();
       ctx.beginPath();
-      ctx.roundRect(-(visual.width / 2), -(visual.height / 2), visual.width, visual.height, visual.cornerRadius);
+      ctx.roundRect(-(frame.width / 2), -(frame.height / 2), frame.width, frame.height, frame.cornerRadius);
       ctx.clip();
       drawImage();
       ctx.restore();
@@ -551,13 +558,13 @@ export class RouletteRenderer {
   private renderImageVisual(ctx: CanvasRenderingContext2D, visual: Extract<SceneVisualNode, { kind: 'image' }>) {
     const image = this.getSceneImage(visual.src);
     if (!image) return;
-    this.drawImageShape(ctx, visual, image);
+    this.drawImageFrame(ctx, visual, image);
   }
 
   private renderImageMask(ctx: CanvasRenderingContext2D, visual: Extract<SceneVisualNode, { kind: 'image' }>) {
     const image = this.getSceneImage(visual.src);
     if (image) {
-      this.drawImageShape(ctx, visual, image);
+      this.drawImageFrame(ctx, visual, image);
       return;
     }
 
@@ -577,6 +584,75 @@ export class RouletteRenderer {
     }
 
     ctx.fillRect(-(visual.width / 2), -(visual.height / 2), visual.width, visual.height);
+  }
+
+  private getEntityRenderBounds(entity: MapEntityState) {
+    switch (entity.shape.type) {
+      case 'box':
+        return {
+          x: -entity.shape.width,
+          y: -entity.shape.height,
+          width: entity.shape.width * 2,
+          height: entity.shape.height * 2,
+          rotation: entity.shape.rotation,
+        };
+      case 'circle':
+        return {
+          x: -entity.shape.radius,
+          y: -entity.shape.radius,
+          width: entity.shape.radius * 2,
+          height: entity.shape.radius * 2,
+          rotation: 0,
+        };
+      case 'polyline': {
+        const xs = entity.shape.points.map(([x]) => x);
+        const ys = entity.shape.points.map(([, y]) => y);
+        const minX = Math.min(...xs);
+        const minY = Math.min(...ys);
+        const maxX = Math.max(...xs);
+        const maxY = Math.max(...ys);
+        return {
+          x: minX,
+          y: minY,
+          width: maxX - minX,
+          height: maxY - minY,
+          rotation: entity.shape.rotation,
+        };
+      }
+    }
+  }
+
+  private renderEntityImage(ctx: CanvasRenderingContext2D, entity: MapEntityState, render: EntityImageRender) {
+    const image = this.getSceneImage(render.src);
+    if (!image) return false;
+
+    const bounds = this.getEntityRenderBounds(entity);
+    const width = render.width ?? bounds.width;
+    const height = render.height ?? bounds.height;
+    if (width <= 0 || height <= 0) return false;
+
+    const centerX = bounds.x + bounds.width / 2 + (render.offsetX ?? 0);
+    const centerY = bounds.y + bounds.height / 2 + (render.offsetY ?? 0);
+    const scaleX = render.scaleX ?? 1;
+    const scaleY = render.scaleY ?? 1;
+
+    ctx.save();
+    ctx.translate(centerX, centerY);
+    ctx.rotate(bounds.rotation + (render.rotation ?? 0));
+    ctx.scale(scaleX, scaleY);
+    ctx.globalAlpha = render.opacity ?? 1;
+    this.drawImageFrame(
+      ctx,
+      {
+        width,
+        height,
+        clipShape: render.clipShape,
+        cornerRadius: render.cornerRadius,
+      },
+      image
+    );
+    ctx.restore();
+    return true;
   }
 
   private getVisualBounds(visual: Extract<SceneVisualNode, { kind: 'shape' }>) {
@@ -777,6 +853,10 @@ export class RouletteRenderer {
       const transform = this.ctx.getTransform();
       this.ctx.translate(entity.x, entity.y);
       this.ctx.rotate(entity.angle);
+      if (entity.render?.kind === 'image' && this.renderEntityImage(this.ctx, entity, entity.render)) {
+        this.ctx.setTransform(transform);
+        return;
+      }
       this.ctx.fillStyle = entity.shape.color ?? this._theme.entity[entity.shape.type].fill;
       this.ctx.strokeStyle = entity.shape.color ?? this._theme.entity[entity.shape.type].outline;
       this.ctx.shadowBlur = this._theme.entity[entity.shape.type].bloomRadius;

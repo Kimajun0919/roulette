@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 220 28" fill="none">
+  <rect x="2" y="6" width="216" height="16" rx="8" fill="url(#rotorFill)"/>
+  <rect x="2.75" y="6.75" width="214.5" height="14.5" rx="7.25" stroke="rgba(255,255,255,0.28)" stroke-width="1.5"/>
+  <rect x="20" y="11" width="180" height="2" rx="1" fill="rgba(255,255,255,0.2)"/>
+  <defs>
+    <linearGradient id="rotorFill" x1="2" y1="14" x2="218" y2="14" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#547acc"/>
+      <stop offset="0.5" stop-color="#80b3ff"/>
+      <stop offset="1" stop-color="#547acc"/>
+    </linearGradient>
+  </defs>
+</svg>

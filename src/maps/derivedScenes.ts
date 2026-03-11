@@ -41,7 +41,7 @@ function withVisualSplitTint(entity: MapEntity): MapEntity {
     ...entity,
     shape: {
       ...entity.shape,
-      color: entity.shape.color ?? (entity.type === 'kinematic' ? KINEMATIC_HIGHLIGHT : STATIC_WIREFRAME),
+      color: entity.type === 'kinematic' ? entity.shape.color ?? KINEMATIC_HIGHLIGHT : STATIC_WIREFRAME,
       bloomColor: entity.shape.bloomColor ?? NO_BLOOM,
     },
   };
@@ -402,7 +402,6 @@ function createWheelOfFortuneVisualSplitScene(): SceneDef | null {
     ...createBoardShellVisuals(stage.entities),
     ...stage.entities.flatMap(createRailVisuals),
     ...stage.entities.map(createStaticBoxVisual).filter((node): node is SceneVisualNode => node !== null),
-    ...stage.entities.map(createKinematicHalo).filter((node): node is SceneVisualNode => node !== null),
   ];
 
   return {
@@ -435,4 +434,270 @@ function createWheelOfFortuneVisualSplitScene(): SceneDef | null {
 
 const wheelOfFortuneVisualSplitScene = createWheelOfFortuneVisualSplitScene();
 
-export const derivedScenes: SceneDef[] = wheelOfFortuneVisualSplitScene ? [wheelOfFortuneVisualSplitScene] : [];
+const YORU_WALL_SPRITE = '/obstacles/yoru-wall.svg';
+const YORU_GEM_SPRITE = '/obstacles/yoru-gem.svg';
+const YORU_ORB_SPRITE = '/obstacles/yoru-orb.svg';
+const YORU_ROTOR_LIME_SPRITE = '/obstacles/yoru-rotor-lime.svg';
+const YORU_ROTOR_CORAL_SPRITE = '/obstacles/yoru-rotor-coral.svg';
+const YORU_ROTOR_BLUE_SPRITE = '/obstacles/yoru-rotor-blue.svg';
+const YORU_ROTOR_PLUM_SPRITE = '/obstacles/yoru-rotor-plum.svg';
+
+function createYoruBackdropVisuals(): SceneVisualNode[] {
+  return [
+    {
+      id: 'yoru-split-backdrop',
+      name: 'Yoru Split Backdrop',
+      kind: 'shape',
+      shape: 'rect',
+      x: 11.5,
+      y: 124,
+      width: 19.6,
+      height: 242,
+      cornerRadius: 1.2,
+      fill: {
+        type: 'linear-gradient',
+        x0: 0,
+        y0: 0,
+        x1: 1,
+        y1: 1,
+        stops: [
+          { offset: 0, color: 'rgba(8, 11, 26, 0.2)' },
+          { offset: 0.38, color: 'rgba(18, 28, 58, 0.34)' },
+          { offset: 1, color: 'rgba(5, 8, 19, 0.22)' },
+        ],
+      },
+      stroke: 'rgba(155, 182, 255, 0.42)',
+      strokeWidth: 0.08,
+      zIndex: -42,
+      effects: [createShadow('rgba(0, 0, 0, 0.24)', 2.2, 1)],
+    },
+    {
+      id: 'yoru-split-moon',
+      name: 'Yoru Split Moon',
+      kind: 'shape',
+      shape: 'circle',
+      x: 11.5,
+      y: 17,
+      radius: 6.2,
+      fill: {
+        type: 'radial-gradient',
+        x0: 0.5,
+        y0: 0.5,
+        x1: 0.88,
+        y1: 0.5,
+        stops: [
+          { offset: 0, color: 'rgba(255, 246, 214, 0.48)' },
+          { offset: 0.55, color: 'rgba(186, 213, 255, 0.2)' },
+          { offset: 1, color: 'rgba(186, 213, 255, 0)' },
+        ],
+      },
+      zIndex: -35,
+      blendMode: 'screen',
+    },
+    {
+      id: 'yoru-split-aurora',
+      name: 'Yoru Split Aurora',
+      kind: 'shape',
+      shape: 'rect',
+      x: 11.5,
+      y: 118,
+      width: 8.4,
+      height: 180,
+      cornerRadius: 1.1,
+      fill: {
+        type: 'linear-gradient',
+        x0: 0.5,
+        y0: 0,
+        x1: 0.5,
+        y1: 1,
+        stops: [
+          { offset: 0, color: 'rgba(255, 255, 255, 0)' },
+          { offset: 0.18, color: 'rgba(163, 196, 255, 0.06)' },
+          { offset: 0.56, color: 'rgba(125, 152, 246, 0.11)' },
+          { offset: 1, color: 'rgba(255, 255, 255, 0)' },
+        ],
+      },
+      zIndex: -30,
+    },
+    {
+      id: 'yoru-split-title',
+      name: 'Yoru Split Title',
+      kind: 'text',
+      x: 11.5,
+      y: 7,
+      text: 'Yoru ni Kakeru / visual split',
+      fontSize: 0.9,
+      fontFamily: 'Georgia',
+      color: 'rgba(237, 244, 255, 0.94)',
+      zIndex: -18,
+      effects: [createShadow('rgba(0, 0, 0, 0.32)', 0.6, 0.08)],
+    },
+    {
+      id: 'yoru-split-subtitle',
+      name: 'Yoru Split Subtitle',
+      kind: 'text',
+      x: 11.5,
+      y: 8.8,
+      text: 'night palette for legacy physics',
+      fontSize: 0.38,
+      fontFamily: 'Georgia',
+      color: 'rgba(202, 215, 252, 0.68)',
+      zIndex: -17,
+    },
+    {
+      id: 'yoru-split-tag',
+      name: 'Yoru Split Tag',
+      kind: 'text',
+      layer: 'screen',
+      x: 10.4,
+      y: 1.4,
+      text: 'visual split scene',
+      fontSize: 0.34,
+      fontFamily: 'Georgia',
+      color: 'rgba(255, 255, 255, 0.7)',
+      zIndex: 10,
+    },
+    {
+      id: 'yoru-split-goal-band',
+      name: 'Yoru Split Goal Band',
+      kind: 'shape',
+      shape: 'rect',
+      x: 11.5,
+      y: 234,
+      width: 15.4,
+      height: 20,
+      cornerRadius: 0.9,
+      fill: {
+        type: 'linear-gradient',
+        x0: 0,
+        y0: 0.5,
+        x1: 1,
+        y1: 0.5,
+        stops: [
+          { offset: 0, color: 'rgba(123, 92, 245, 0.08)' },
+          { offset: 0.5, color: 'rgba(236, 209, 255, 0.18)' },
+          { offset: 1, color: 'rgba(123, 92, 245, 0.08)' },
+        ],
+      },
+      stroke: 'rgba(206, 197, 255, 0.32)',
+      strokeWidth: 0.06,
+      zIndex: -12,
+    },
+  ];
+}
+
+function getYoruRotorSprite(color: string | undefined) {
+  switch (color?.toLowerCase()) {
+    case '#9bec00':
+      return YORU_ROTOR_LIME_SPRITE;
+    case '#ff6868':
+      return YORU_ROTOR_CORAL_SPRITE;
+    case '#80b3ff':
+      return YORU_ROTOR_BLUE_SPRITE;
+    case '#5c5470':
+      return YORU_ROTOR_PLUM_SPRITE;
+    default:
+      return YORU_ROTOR_BLUE_SPRITE;
+  }
+}
+
+function withYoruEntityRender(entity: MapEntity, stageHeight: number): MapEntity {
+  if (entity.shape.type === 'box') {
+    if (entity.type === 'static' && entity.shape.height >= 100) {
+      return {
+        ...entity,
+        render: {
+          kind: 'image',
+          src: YORU_WALL_SPRITE,
+          width: entity.shape.width * 2.15,
+          height: stageHeight + 10,
+          offsetY: stageHeight / 2 - 2,
+          opacity: 0.94,
+        },
+      };
+    }
+
+    if (entity.type === 'static') {
+      return {
+        ...entity,
+        render: {
+          kind: 'image',
+          src: YORU_GEM_SPRITE,
+          width: entity.shape.width * 2,
+          height: entity.shape.height * 2,
+          opacity: 0.98,
+        },
+      };
+    }
+
+    return {
+      ...entity,
+      render: {
+        kind: 'image',
+        src: getYoruRotorSprite(entity.shape.color),
+        width: entity.shape.width * 2,
+        height: Math.max(entity.shape.height * 2, 0.36),
+        opacity: 0.96,
+      },
+    };
+  }
+
+  if (entity.shape.type === 'circle') {
+    return {
+      ...entity,
+      render: {
+        kind: 'image',
+        src: YORU_ORB_SPRITE,
+        width: entity.shape.radius * 2,
+        height: entity.shape.radius * 2,
+        opacity: 0.98,
+      },
+    };
+  }
+
+  return entity;
+}
+
+function createYoruNiKakeruVisualSplitScene(): SceneDef | null {
+  const stage = stages.find((entry) => entry.title === 'Yoru ni Kakeru');
+  if (!stage?.entities?.length) {
+    return null;
+  }
+
+  const stageHeight = Math.max(stage.goalY, stage.zoomY);
+  const entities = stage.entities.map((entity) => withYoruEntityRender(withVisualSplitTint(entity), stageHeight));
+  const visuals = createYoruBackdropVisuals();
+
+  return {
+    id: 'yoru-ni-kakeru-visual-split',
+    title: 'Yoru ni Kakeru / Visual split',
+    width: DEFAULT_SCENE_WIDTH,
+    goalY: stage.goalY,
+    zoomY: stage.zoomY,
+    anchors: {
+      goalY: stage.goalY,
+      zoomY: stage.zoomY,
+      spawnCenter: DEFAULT_SPAWN_CENTER,
+      minimapBounds: {
+        x: 0,
+        y: 0,
+        width: DEFAULT_SCENE_WIDTH,
+        height: Math.max(stage.goalY, stage.zoomY),
+      },
+      cameraStart: {
+        x: 11.5,
+        y: 16,
+        zoom: 1,
+      },
+    },
+    entities,
+    visuals,
+    source: 'legacy',
+  };
+}
+
+const yoruNiKakeruVisualSplitScene = createYoruNiKakeruVisualSplitScene();
+
+export const derivedScenes: SceneDef[] = [
+  ...[wheelOfFortuneVisualSplitScene, yoruNiKakeruVisualSplitScene].filter((scene): scene is SceneDef => scene !== null),
+];

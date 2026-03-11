@@ -2,6 +2,23 @@ import type { VectorLike } from './VectorLike';
 
 export type EntityShapeTypes = 'box' | 'circle' | 'polyline';
 
+export type EntityImageRender = {
+  kind: 'image';
+  src: string;
+  width?: number;
+  height?: number;
+  offsetX?: number;
+  offsetY?: number;
+  rotation?: number;
+  opacity?: number;
+  scaleX?: number;
+  scaleY?: number;
+  clipShape?: 'rect' | 'circle';
+  cornerRadius?: number;
+};
+
+export type EntityRender = EntityImageRender;
+
 export interface EntityShapeBase {
   type: EntityShapeTypes;
   color?: string;
@@ -40,6 +57,7 @@ export interface MapEntity {
   type: 'static' | 'kinematic';
   shape: EntityShape;
   props: EntityPhysicalProps;
+  render?: EntityRender;
 }
 
 export interface MapEntityState {
@@ -48,4 +66,5 @@ export interface MapEntityState {
   angle: number;
   shape: EntityShape;
   life: number;
+  render?: EntityRender;
 }
