@@ -1,80 +1,424 @@
 # HANDOVER
 
-최종 갱신: 2026-03-10 (main 기준)
+최종 갱신: 2026-03-11
 
-## 1) 현재 브랜치/배포 기준
+## 1. 인수인계 요약
 
-- 기준 브랜치: `main`
-- 엔트리: `index.html -> src/main.tsx`
-- 빌드 출력: `dist/`
-- 패키지 매니저 기준: `npm` (`package-lock.json`)
+이번 작업의 핵심은 맵 시스템을 `legacy stage array` 중심 구조에서 `scene catalog + external scene + Figma importer` 구조로 확장한 것입니다.
 
-## 2) 현재 상태 요약
+현재 앱은 다음을 할 수 있습니다.
 
-- React + Vite 전환 완료
-- `src-react`/Parcel 레거시 정리 완료
-- Service Worker/Workbox 제거 완료
-- 캔버스 오버레이 UI를 React 컴포넌트로 운영 중
-  - `RankingOverlay`, `MinimapCard`, `FastForwardOverlay`, `WinnerSpotlightCard`
+- legacy stage를 scene id로 선택
+- external scene JSON을 manifest에 등록해 런타임에서 교체
+- raw Figma frame JSON을 importer로 읽어서 scene으로 변환
+- Figma visuals 일부를 실제 canvas에 렌더
+- `clipsContent`, blend mode, vector mask 일부를 scene visuals에 반영
 
-## 3) 핵심 파일 인수 포인트
+즉, 지금 상태는 `디자인 자산 기반 맵 교체 파이프라인의 1차 usable 버전`입니다. 아직 완전 자동화나 Figma parity 100%는 아니지만, external scene 교체와 richer visual 렌더는 가능한 상태입니다.
 
-### UI/상태
-- `src/App.tsx`: 전체 화면 레이아웃/상호작용 허브
-- `src/store/uiState.ts`: reducer, action, 초기 상태
-- `src/store/useRouletteUi.ts`: names 파싱, API 모드 로딩
+## 2. 최근 변경 사항
 
-### 엔진 브릿지
-- `src/engine/useRouletteEngine.ts`
-  - 엔진 lifecycle
-  - ranking/uiSnapshot/녹화 이벤트 동기화
+### 2.1 scene 구조 도입
+
+- `src/maps/sceneSchema.ts`
+  - `SceneDef`, `SceneOption`, `SceneCatalog` 추가
+  - anchors, visuals, paint, effects, clip schema 정의
+- `src/maps/scenes.ts`
+  - legacy `stages.ts`를 `SceneDef[]`로 감쌈
+- `src/maps/sceneLoader.ts`
+  - legacy + external scene merge
+  - URL 로드
+  - raw Figma frame payload 처리
+- `src/maps/externalSceneManifest.ts`
+  - external scene URL 등록 지점
+
+### 2.2 엔진 scene id 전환
+
+- `src/engine-core/roulette.ts`
+  - `loadSceneCatalog()` 호출
+  - `setScene(sceneId)` 추가
+  - scene anchor 기반 `spawnCenter`, `cameraStart` 사용
+  - UI snapshot에 `sceneId`, `stageWidth` 등 반영
 - `src/engine/RouletteEngineAdapter.ts`
-  - 엔진 메서드 래핑 (`setMap`, `setTheme`, `setFastForwardEnabled` 등)
+  - `setScene(sceneId)` 노출
+- `src/engine/useRouletteEngine.ts`
+  - scene option과 scene id 기반 상태 반영
+- `src/store/uiState.ts`
+  - `selectedSceneId` 보관
+- `src/App.tsx`
+  - 드롭다운 선택 시 `setScene(sceneId)` 호출
 
-### 엔진 코어
-- `src/engine-core/roulette.ts`: 메인 시뮬레이션 루프
-- `src/engine-core/rouletteRenderer.ts`: canvas 렌더
-  - React가 만든 `<canvas>`를 주입받아 사용 가능
-- `src/engine-core/physics-box2d.ts`: Box2D 연동
+### 2.3 minimap과 scene 폭 연동
 
-### API
-- `src/api/haneulbit.ts`
-  - 권한 체크(`super_admin`) + attendance 집계
+- `src/components/MinimapCard.tsx`
+  - 더 이상 고정 `26`만 가정하지 않음
+  - snapshot의 `stageWidth` 기반으로 viewBox 계산
 
-## 4) 운영/개발 명령
+### 2.4 Figma importer 확장
+
+- `src/maps/importers/figmaSceneImporter.ts`
+  - physics / visuals / anchors 파싱
+  - image paint
+  - text
+  - vector/boolean path
+  - gradient
+  - effects 일부
+  - blend mode 일부
+  - `clipsContent`
+  - `isMask`
+
+### 2.5 renderer 확장
+
+- `src/engine-core/rouletteRenderer.ts`
+  - scene visuals 렌더
+  - world/screen layer 분리
+  - image draw
+  - gradient draw
+  - `Path2D` path draw
+  - clip 적용
+  - blend mode 적용
+  - vector mask clip 적용
+
+### 2.6 샘플 scene 추가
+
+- `public/scenes/external-demo-ramp.scene.json`
+- `public/scenes/figma-frame-demo.scene.json`
+- `public/scenes/figma-rich-demo.scene.json`
+- `public/scenes/figma-demo-badge.svg`
+
+## 3. 현재 동작 방식
+
+### 3.1 앱 초기화
+
+1. React가 `App.tsx` 렌더
+2. `useRouletteEngine()`가 `RouletteEngineAdapter` 생성
+3. `Roulette` 초기화 시 `loadSceneCatalog()` 호출
+4. scene catalog 준비 후 `ready` 이벤트 발생
+5. UI는 map dropdown에 `SceneOption[]` 렌더
+
+### 3.2 scene 선택
+
+1. 사용자가 Map 드롭다운에서 scene 선택
+2. `App.tsx`가 reducer state의 `selectedSceneId` 갱신
+3. `useRouletteEngine().setMap(sceneId)` 호출
+4. adapter가 `roulette.setScene(sceneId)` 호출
+5. 엔진이 scene을 교체하고 names/winner rank 재적용
+
+### 3.3 external scene 로드
+
+`src/maps/externalSceneManifest.ts`에 URL을 추가하면 됩니다.
+
+로더는 URL별로 아래 순서로 판별합니다.
+
+1. Figma wrapper payload인가
+2. raw Figma frame node인가
+3. 정규화된 scene JSON인가
+
+로딩 실패 scene은 `Promise.allSettled()`에서 버리고 `console.warn()`만 남깁니다. 전체 앱 부팅은 막지 않습니다.
+
+## 4. scene 데이터 계약
+
+### 4.1 핵심 타입
+
+`SceneDef`
+
+- `id`
+- `title`
+- `width`
+- `goalY`
+- `zoomY`
+- `anchors`
+- `entities`
+- `visuals`
+- `source`
+
+`source`
+
+- `legacy`
+- `json`
+- `figma`
+
+### 4.2 anchors
+
+- `goalY`
+  - 우승 판정 라인
+- `zoomY`
+  - 카메라 축소/집중 로직 기준
+- `spawnCenter`
+  - marble 스폰 중심
+- `minimapBounds`
+  - 현재 로더/정규화 fallback용
+- `cameraStart`
+  - 초기 카메라 위치
+
+### 4.3 visuals
+
+지원 visual kind
+
+- `shape`
+- `text`
+- `image`
+- `group`
+
+지원 fill/paint
+
+- solid color
+- linear gradient
+- radial gradient
+- conic gradient
+- diamond gradient
+
+지원 effect
+
+- `drop-shadow`
+- `layer-blur`
+
+지원 clip
+
+- rect clip
+- circle clip
+- path clip
+
+## 5. Figma importer 상세
+
+### 5.1 기대하는 Figma frame 구조
+
+top-level frame 아래 정확히 다음 그룹을 둡니다.
+
+- `physics`
+- `visuals`
+- `anchors`
+
+### 5.2 physics 변환
+
+- `RECTANGLE` -> `box`
+- `ELLIPSE` -> `circle`
+- `LINE/VECTOR` -> `polyline`
+
+physics metadata는 레이어명 `| key=value` 또는 `pluginData`에서 읽습니다.
+
+현재 읽는 항목:
+
+- `body`
+- `density`
+- `restitution`
+- `angularVelocity`
+- `life`
+
+### 5.3 visuals 변환
+
+현재 처리 대상:
+
+- `RECTANGLE`
+- `ELLIPSE`
+- `TEXT`
+- `FRAME`
+- `INSTANCE`
+- `COMPONENT`
+- `COMPONENT_SET`
+- `VECTOR`
+- `BOOLEAN_OPERATION`
+- `STAR`
+- `POLYGON`
+
+현재 처리 속성:
+
+- `fills`
+- `strokes`
+- `fillGeometry`
+- `strokeGeometry`
+- `imageRef`
+- `effects`
+- `blendMode`
+- `clipsContent`
+- `isMask`
+- `textAlignHorizontal`
+- `fontSize`
+- `fontName`
+- `absoluteBoundingBox`
+
+### 5.4 mask와 clipping 규칙
+
+- frame-like node의 `clipsContent`는 자식 clip으로 전파
+- `isMask: true` 노드는 직접 렌더하지 않음
+- `isMask` 노드는 같은 sibling 이후 요소들에 clip path로 적용
+- 현재 구현은 practical subset 기준
+  - Figma의 모든 mask mode를 1:1 재현하는 구조는 아직 아님
+
+## 6. Renderer 상세
+
+### 6.1 현재 지원되는 visual 렌더
+
+- rect
+- circle
+- polyline
+- path
+- text
+- image
+
+### 6.2 현재 지원되는 visual 속성
+
+- opacity
+- rotation
+- scaleX
+- scaleY
+- zIndex
+- blend mode
+- clipRect
+- clips
+- stroke width
+- corner radius
+
+### 6.3 gradient 처리
+
+- linear
+  - native linear gradient
+- radial
+  - native radial gradient
+- conic
+  - 브라우저 `createConicGradient()` 사용
+  - 미지원 브라우저에서는 linear fallback
+- diamond
+  - 현재 radial approximation
+
+### 6.4 주의 사항
+
+- minimap은 visuals를 그리지 않음
+- minimap은 entity physics 상태만 사용
+- renderer는 Figma parity보다 `런타임 안정성` 우선
+
+## 7. 샘플 asset 설명
+
+### `external-demo-ramp.scene.json`
+
+- 정규화된 scene JSON 예시
+- external scene 기본 교체 확인용
+
+### `figma-frame-demo.scene.json`
+
+- raw Figma frame JSON의 최소 사용 예시
+
+### `figma-rich-demo.scene.json`
+
+- 현재 지원되는 richer visual 기능 시연용
+- 포함 기능
+  - image paint
+  - boolean path
+  - radial gradient
+  - angular gradient
+  - blend mode
+  - frame clipping
+  - vector mask
+
+## 8. 문서와 전달물
+
+- `README.md`
+  - 현재 구조와 빠른 시작
+- `docs/FIGMA_MAP_AUTHORING_GUIDE.md`
+  - Figma authoring contract
+- `docs/FIGMA_DESIGN_REQUEST.md`
+  - 디자이너 전달용 요청서
+
+## 9. 아직 안 된 것
+
+이 항목들은 아직 미구현 또는 partial support 상태입니다.
+
+- `INNER_SHADOW`
+- `BACKGROUND_BLUR`
+- mask mode 세부 규칙 전체
+- Figma auto layout 재계산
+- effect parity 100%
+- Figma export 자동화
+- MCP -> export -> manifest 자동 등록
+- scene validation 강화
+- scene schema versioning
+
+## 10. 리스크와 주의점
+
+### 10.1 importer 안정성
+
+현재 importer는 demo/authoring contract 기반으로는 usable 하지만, arbitrary Figma 파일을 아무 제약 없이 넣는 수준은 아닙니다.
+
+리스크:
+
+- layer naming 누락 시 physics metadata 손실
+- 복잡한 vector는 path fidelity 차이 발생 가능
+- design이 px scale을 어기면 physics와 visuals가 어긋남
+
+### 10.2 auto layout 해석
+
+현재는 auto layout engine을 다시 계산하지 않습니다. Figma가 이미 계산한 absolute bounding box를 사용합니다.
+
+즉:
+
+- 최종 위치는 대체로 맞음
+- layout semantics 자체를 런타임이 이해하는 것은 아님
+
+### 10.3 clip/mask 구현 범위
+
+현재는 `practical subset` 구현입니다.
+
+- frame clipping은 usable
+- vector mask도 usable
+- 하지만 advanced mask behavior는 아직 아님
+
+## 11. 다음 우선순위
+
+### 우선순위 1
+
+- `INNER_SHADOW`
+- `BACKGROUND_BLUR`
+- 오프스크린 합성 레이어 추가
+
+### 우선순위 2
+
+- importer validation 강화
+- scene schema version 필드 도입
+- 잘못된 Figma payload 오류 메시지 개선
+
+### 우선순위 3
+
+- Figma export automation
+- manifest 자동 등록 도구
+- 디자인 자산 pipeline 문서화 강화
+
+## 12. 운영/개발 명령
 
 ```bash
 npm install
 npm run dev
-npm run lint
 npm run build
 npm run preview
+npm run lint
 ```
 
-## 5) 문서 작성 시점 점검 결과
+기본 포트:
 
-### 정상
-- `npm run lint` 통과
+- dev: `1236`
+- preview: `4174`
+
+## 13. 인수 체크리스트
+
+- [ ] `npm run dev`로 앱 기동 확인
+- [ ] Map 드롭다운에 external scenes가 보이는지 확인
+- [ ] `External Demo Ramp` 선택 시 scene 교체 확인
+- [ ] `Figma Frame Demo` 선택 시 importer 기본 경로 확인
+- [ ] `Figma Rich Demo` 선택 시 clip/blend/mask 시각 확인
+- [ ] local names 입력 후 추첨 시작 확인
+- [ ] API 모드 attendance 로드 확인
+- [ ] 자동 녹화 다운로드 확인
+
+## 14. 최근 검증
+
+2026-03-11 기준 확인 완료:
+
 - `npm run build` 통과
+- `http://localhost:1236/` 응답 확인
+- `http://localhost:1236/scenes/figma-rich-demo.scene.json` 응답 확인
 
-### 확인 필요/개선 후보
-1. `useRouletteEngine`의 100ms polling 동기화
-   - 이벤트 push 방식으로 변경 시 효율 개선 가능
-2. `src/engine-core/misc/recap*.ts` 실사용 여부 재검토
-3. 자동화 테스트(E2E smoke) 부재
-4. API 운영 가이드(`.env.example`, 토큰 보안 가이드) 보강 필요
+## 15. 참고
 
-## 6) 권장 다음 작업
+Figma REST API 참고:
 
-1) 엔진 -> UI snapshot 이벤트 기반 전환  
-2) recap 파일 정리 여부 결정  
-3) Playwright smoke 시나리오 추가  
-4) API 모드 운영 문서 강화
-
-## 7) 인수 체크리스트
-
-- [ ] dev 서버 기동 확인 (`:1236`)
-- [ ] 추첨 시나리오(first/last/custom) 확인
-- [ ] FastForward / 미니맵 동작 확인
-- [ ] API 모드 권한/데이터 반영 확인
-- [ ] 녹화 다운로드 링크 확인
+- https://developers.figma.com/docs/rest-api/file-node-types/
+- https://developers.figma.com/docs/rest-api/images/
