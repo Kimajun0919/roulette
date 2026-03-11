@@ -35,7 +35,7 @@ export type SceneDef = {
   anchors: SceneAnchors;
   entities?: MapEntity[];
   visuals?: SceneVisualNode[];
-  source: 'legacy' | 'figma';
+  source: 'legacy' | 'json' | 'figma';
 };
 
 export type SceneOption = {
@@ -43,4 +43,10 @@ export type SceneOption = {
   index: number;
   title: string;
   source: SceneDef['source'];
+};
+
+export type SceneCatalog = {
+  scenes: SceneDef[];
+  options: SceneOption[];
+  defaultSceneId: string;
 };

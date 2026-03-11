@@ -1,6 +1,6 @@
 import { Camera } from './camera';
 import { canvasHeight, canvasWidth, initialZoom, Skills, Themes, zoomThreshold } from './data/constants';
-import { defaultSceneId, getSceneById, getSceneByIndex, type StageDef, sceneOptions, scenes } from './data/maps';
+import type { SceneCatalog, StageDef } from './data/maps';
 import type { GameObject } from './gameObject';
 import type { IPhysics } from './IPhysics';
 import { Marble } from './marble';
@@ -12,6 +12,7 @@ import type { ColorTheme } from './types/ColorTheme';
 import { bound } from './utils/bound.decorator';
 import { parseName, shuffle } from './utils/utils';
 import { type RecordingReadyDetail, VideoRecorder } from './utils/videoRecorder';
+import { loadSceneCatalog } from '../maps/sceneLoader';
 
 type RouletteInitOptions = {
   mountElement?: HTMLElement;
@@ -31,7 +32,8 @@ export class Roulette extends EventTarget {
   private _winners: Marble[] = [];
   private _particleManager = new ParticleManager();
   private _stage: StageDef | null = null;
-  private _sceneId: string = defaultSceneId;
+  private _sceneCatalog: SceneCatalog = { scenes: [], options: [], defaultSceneId: '' };
+  private _sceneId: string = '';
 
   protected _camera: Camera = new Camera();
   protected _renderer: RouletteRenderer;
@@ -238,8 +240,9 @@ export class Roulette extends EventTarget {
     this.physics = new Box2dPhysics();
     await this.physics.init();
 
-    this._stage = scenes[0] ?? null;
-    this._sceneId = this._stage?.id ?? defaultSceneId;
+    this._sceneCatalog = await loadSceneCatalog();
+    this._stage = this._sceneCatalog.scenes[0] ?? null;
+    this._sceneId = this._stage?.id ?? this._sceneCatalog.defaultSceneId;
     this._loadMap();
   }
 
@@ -382,7 +385,7 @@ export class Roulette extends EventTarget {
   }
 
   public getMaps() {
-    return sceneOptions;
+    return this._sceneCatalog.options;
   }
 
   public getRankingSnapshot() {
@@ -406,7 +409,7 @@ export class Roulette extends EventTarget {
   }
 
   public setScene(sceneId: string) {
-    const scene = getSceneById(sceneId);
+    const scene = this._sceneCatalog.scenes.find((entry) => entry.id === sceneId) ?? null;
     if (!scene) {
       throw new Error('Incorrect scene id');
     }
@@ -419,7 +422,7 @@ export class Roulette extends EventTarget {
   }
 
   public setMap(index: number) {
-    const scene = getSceneByIndex(index);
+    const scene = this._sceneCatalog.scenes[index] ?? null;
     if (!scene) {
       throw new Error('Incorrect map number');
     }

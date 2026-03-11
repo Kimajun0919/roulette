@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { type RecordingResult, RouletteEngineAdapter, type WinnerType } from './RouletteEngineAdapter';
+import type { SceneOption } from '../maps/sceneSchema';
 
 type Params = {
   canvasElement: HTMLCanvasElement | null;
@@ -41,7 +42,7 @@ export function useRouletteEngine({
   const [engineReady, setEngineReady] = useState(false);
   const [goalWinner, setGoalWinner] = useState<string | null>(null);
   const [lastMessage, setLastMessage] = useState<string | null>(null);
-  const [maps, setMaps] = useState<Array<{ id: string; index: number; title: string; source: 'legacy' | 'figma' }>>([]);
+  const [maps, setMaps] = useState<SceneOption[]>([]);
   const [themes, setThemes] = useState<string[]>([]);
   const [ranking, setRanking] = useState<RankingItem[]>([]);
   const [uiSnapshot, setUiSnapshot] = useState<UiSnapshot | null>(null);

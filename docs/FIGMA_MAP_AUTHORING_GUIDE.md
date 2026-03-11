@@ -260,3 +260,24 @@ This guide is only the design contract. The codebase still needs these changes t
 - separate gameplay physics from optional visual overlays
 
 Until that work lands, this guide should be treated as the target authoring contract, not as a fully wired pipeline.
+
+## Current Integration Status
+
+The app now has the first importer-facing structure in place:
+
+- runtime scenes are identified by scene id, not only by array index
+- a scene loader can merge legacy scenes with external scene URLs
+- external scene registration starts in `src/maps/externalSceneManifest.ts`
+- a Figma frame importer skeleton exists in `src/maps/importers/figmaSceneImporter.ts`
+
+Current expected external inputs:
+
+- normalized scene JSON that already matches `SceneDef`
+- raw Figma frame JSON with `physics`, `visuals`, `anchors` groups
+
+This is still a skeleton. Before production use, the importer should be hardened for:
+
+- stricter validation
+- richer vector parsing
+- plugin data support
+- scene versioning rules

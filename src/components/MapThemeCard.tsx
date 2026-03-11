@@ -1,8 +1,8 @@
-type MapOption = { id: string; index: number; title: string; source: 'legacy' | 'figma' };
+import type { SceneOption } from '../maps/sceneSchema';
 
 type Props = {
   engineReady: boolean;
-  maps: MapOption[];
+  maps: SceneOption[];
   selectedSceneId: string;
   onMapChange: (sceneId: string) => void;
   theme: string;
