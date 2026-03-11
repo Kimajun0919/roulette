@@ -1,0 +1,133 @@
+{
+  "sceneId": "brand-season-01",
+  "sceneTitle": "Brand Season 01",
+  "pxPerUnit": 100,
+  "imageUrls": {
+    "logoImageRef123": "/scenes/assets/logo-badge.png",
+    "bgImageRef456": "/scenes/assets/bg-panel.jpg"
+  },
+  "frame": {
+    "id": "1:2",
+    "name": "Scene/brand-season-01",
+    "type": "FRAME",
+    "absoluteBoundingBox": {
+      "x": 0,
+      "y": 0,
+      "width": 2600,
+      "height": 5200
+    },
+    "children": [
+      {
+        "id": "1:10",
+        "name": "physics",
+        "type": "GROUP",
+        "children": [
+          {
+            "id": "1:11",
+            "name": "wall-left | body=static | density=1 | restitution=0 | angularVelocity=0",
+            "type": "RECTANGLE",
+            "absoluteBoundingBox": {
+              "x": 80,
+              "y": 0,
+              "width": 40,
+              "height": 3200
+            }
+          }
+        ]
+      },
+      {
+        "id": "1:20",
+        "name": "visuals",
+        "type": "GROUP",
+        "children": [
+          {
+            "id": "1:21",
+            "name": "bg-panel",
+            "type": "RECTANGLE",
+            "absoluteBoundingBox": {
+              "x": 0,
+              "y": 0,
+              "width": 2600,
+              "height": 5200
+            },
+            "fills": [
+              {
+                "type": "SOLID",
+                "color": {
+                  "r": 0.09,
+                  "g": 0.12,
+                  "b": 0.18,
+                  "a": 1
+                }
+              }
+            ]
+          },
+          {
+            "id": "1:22",
+            "name": "scene-title | layer=screen | zIndex=20",
+            "type": "TEXT",
+            "characters": "Brand Season 01",
+            "fontSize": 96,
+            "absoluteBoundingBox": {
+              "x": 900,
+              "y": 120,
+              "width": 800,
+              "height": 120
+            },
+            "fills": [
+              {
+                "type": "SOLID",
+                "color": {
+                  "r": 1,
+                  "g": 1,
+                  "b": 1,
+                  "a": 1
+                }
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "1:30",
+        "name": "anchors",
+        "type": "GROUP",
+        "children": [
+          {
+            "id": "1:31",
+            "name": "goal-y",
+            "type": "RECTANGLE",
+            "absoluteBoundingBox": {
+              "x": 1200,
+              "y": 4400,
+              "width": 40,
+              "height": 40
+            }
+          },
+          {
+            "id": "1:32",
+            "name": "zoom-y",
+            "type": "RECTANGLE",
+            "absoluteBoundingBox": {
+              "x": 1200,
+              "y": 2600,
+              "width": 40,
+              "height": 40
+            }
+          },
+          {
+            "id": "1:33",
+            "name": "spawn-center",
+            "type": "ELLIPSE",
+            "absoluteBoundingBox": {
+              "x": 1200,
+              "y": 180,
+              "width": 40,
+              "height": 40
+            }
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -119,6 +119,9 @@ public/
 docs/
   FIGMA_MAP_AUTHORING_GUIDE.md
   FIGMA_DESIGN_REQUEST.md
+  FIGMA_STRICT_IMPORT_CONTRACT.md
+  examples/
+    figma-wrapper-payload.example.json
   REACT_MIGRATION_PLAN.md
 ```
 
@@ -288,15 +291,16 @@ docs/
 - effects 일부
   - `DROP_SHADOW`
   - `LAYER_BLUR`
+  - `INNER_SHADOW`
+  - `BACKGROUND_BLUR`
 
 ### 아직 완전히 지원하지 않는 것
 
-- `INNER_SHADOW`
-- `BACKGROUND_BLUR`
 - mask type 세부 규칙 전체
 - Figma auto layout 재계산
   - 현재는 absolute bounding box 기준 정규화
 - effect parity 100%
+  - `INNER_SHADOW`, `BACKGROUND_BLUR`는 1차 오프스크린 합성으로 지원하지만 Figma와 100% 동일한 결과를 보장하지는 않음
 - Figma export 자동화
 - MCP에서 바로 추출 후 manifest 자동 등록
 
@@ -322,6 +326,9 @@ docs/
   - angular gradient
   - frame clipping
   - blend mode
+  - inner shadow
+  - background blur
+  - visual collider proxy
   - vector mask
 
 ## UI와 scene 연결 포인트
@@ -359,6 +366,8 @@ attendance count는 `name*count` 형태로 names input에 반영됩니다.
 ## 문서
 
 - Figma authoring contract: `docs/FIGMA_MAP_AUTHORING_GUIDE.md`
+- Figma strict import contract: `docs/FIGMA_STRICT_IMPORT_CONTRACT.md`
+- Figma wrapper payload example: `docs/examples/figma-wrapper-payload.example.json`
 - 디자이너 전달용 요청서: `docs/FIGMA_DESIGN_REQUEST.md`
 - React 전환 메모: `docs/REACT_MIGRATION_PLAN.md`
 - 인수인계: `HANDOVER.md`

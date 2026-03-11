@@ -122,12 +122,29 @@ export type SceneDropShadowEffect = {
   blur: number;
 };
 
+export type SceneInnerShadowEffect = {
+  type: 'inner-shadow';
+  color: string;
+  offsetX: number;
+  offsetY: number;
+  blur: number;
+};
+
 export type SceneLayerBlurEffect = {
   type: 'layer-blur';
   radius: number;
 };
 
-export type SceneEffect = SceneDropShadowEffect | SceneLayerBlurEffect;
+export type SceneBackgroundBlurEffect = {
+  type: 'background-blur';
+  radius: number;
+};
+
+export type SceneEffect =
+  | SceneDropShadowEffect
+  | SceneInnerShadowEffect
+  | SceneLayerBlurEffect
+  | SceneBackgroundBlurEffect;
 
 export type SceneShapeVisual = SceneVisualBase & {
   kind: 'shape';

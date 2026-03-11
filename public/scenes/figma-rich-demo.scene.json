@@ -287,6 +287,16 @@
             "strokeWeight": 6,
             "effects": [
               {
+                "type": "BACKGROUND_BLUR",
+                "radius": 26
+              },
+              {
+                "type": "INNER_SHADOW",
+                "color": { "r": 0.01, "g": 0.03, "b": 0.08, "a": 0.52 },
+                "radius": 28,
+                "offset": { "x": 0, "y": 16 }
+              },
+              {
                 "type": "DROP_SHADOW",
                 "color": { "r": 0, "g": 0, "b": 0, "a": 0.28 },
                 "radius": 28,

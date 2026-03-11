@@ -266,10 +266,31 @@ function toSceneEffects(effects: FigmaEffect[] | undefined, pxPerUnit: number): 
         ];
       }
 
+      if (effect.type === 'INNER_SHADOW') {
+        return [
+          {
+            type: 'inner-shadow',
+            color: toCssColor(effect.color, 1) ?? 'rgba(0, 0, 0, 0.35)',
+            offsetX: (effect.offset?.x ?? 0) / pxPerUnit,
+            offsetY: (effect.offset?.y ?? 0) / pxPerUnit,
+            blur: (effect.radius ?? 0) / pxPerUnit,
+          },
+        ];
+      }
+
       if (effect.type === 'LAYER_BLUR') {
         return [
           {
             type: 'layer-blur',
+            radius: (effect.radius ?? 0) / pxPerUnit,
+          },
+        ];
+      }
+
+      if (effect.type === 'BACKGROUND_BLUR') {
+        return [
+          {
+            type: 'background-blur',
             radius: (effect.radius ?? 0) / pxPerUnit,
           },
         ];

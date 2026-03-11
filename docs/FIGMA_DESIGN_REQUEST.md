@@ -4,6 +4,8 @@
 
 이 문서는 디자이너에게 바로 전달할 수 있는 요청서입니다.
 
+실제 handoff를 "그 안에서 만들면 무조건 되게" 기준으로 맞추려면 `docs/FIGMA_STRICT_IMPORT_CONTRACT.md`를 함께 전달해 주세요. 이 문서는 설명서이고, strict contract 문서는 허용 범위를 고정하는 계약서입니다.
+
 목표는 다음 두 가지를 동시에 만족하는 맵 제작입니다.
 
 - 런타임에서 전체 맵을 교체할 수 있어야 함
@@ -36,6 +38,7 @@
 physics는 실제 충돌과 게임 판정을 위한 레이어이고, visuals는 장식 전용입니다.
 physics와 visuals를 절대 섞지 말아 주세요.
 전체 scene은 고정 스케일로 작업해야 하며, 2600px = 26 world units, 100px = 1 world unit 기준을 사용합니다.
+strict import contract 문서에서 허용한 형식과 요소만 사용해 주세요.
 ```
 
 ## 전달물 요구사항
@@ -198,13 +201,15 @@ rotor-main | body=kinematic | density=1 | restitution=0 | angularVelocity=3.5
 - blend mode 일부
 - drop shadow
 - layer blur
+- inner shadow
+- background blur
 
 ### 아직 완전하지 않은 것
 
-- inner shadow
-- background blur
 - 고급 mask behavior 전체
 - Figma auto layout semantics 전체
+- effect parity 100%
+  - inner shadow / background blur는 1차 지원 상태이며 복합 조합에서는 차이가 날 수 있음
 
 디자인 시 주의:
 

@@ -4,6 +4,8 @@
 
 This document defines how map scenes should be authored in Figma so they can later be imported into the roulette runtime.
 
+If the requirement is "build inside a subset that imports without engineering cleanup", use `docs/FIGMA_STRICT_IMPORT_CONTRACT.md` as the primary contract.
+
 The immediate goal is to make both of these workflows possible:
 
 - Replace a full map scene.
@@ -65,6 +67,13 @@ Rules:
 - Positive `y` goes downward.
 - Keep the map centered and aligned to the same scene frame origin policy.
 - If the scale ever changes, it must change globally for every scene and importer.
+
+Strict import contract:
+
+- scene width must stay `2600 px`
+- runtime width must stay `26 world units`
+- `100 px = 1 world unit`
+- do not change this per scene
 
 ## Required Anchors
 

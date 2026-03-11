@@ -34,6 +34,11 @@ export type RenderParameters = {
   theme: ColorTheme;
 };
 
+type RenderSurface = {
+  canvas: HTMLCanvasElement;
+  ctx: CanvasRenderingContext2D;
+};
+
 export class RouletteRenderer {
   protected _canvas!: HTMLCanvasElement;
   protected ctx!: CanvasRenderingContext2D;
@@ -41,6 +46,7 @@ export class RouletteRenderer {
 
   protected _images: { [key: string]: HTMLImageElement } = {};
   protected _sceneImages = new Map<string, HTMLImageElement | Promise<HTMLImageElement>>();
+  protected _effectSurfaces = new Map<string, RenderSurface>();
   protected _theme: ColorTheme = Themes.dark;
   protected _keywordService: KeywordService;
   protected _mountElement: HTMLElement;
@@ -109,6 +115,7 @@ export class RouletteRenderer {
     this._isDestroyed = true;
     this._resizeObserver?.disconnect();
     this._resizeObserver = null;
+    this._effectSurfaces.clear();
     this._keywordService.destroy();
     if (this._ownsCanvas && this._canvas?.isConnected) {
       this._canvas.remove();
@@ -217,62 +224,100 @@ export class RouletteRenderer {
 
     this.ctx.save();
     for (const visual of items) {
+      const baseTransform = this.ctx.getTransform();
+      const pixelScale = this.getVisualPixelScale(baseTransform, visual);
+      this.renderBackgroundBlurEffect(visual, baseTransform, pixelScale);
+
       this.ctx.save();
-      this.applyVisualClip(visual.clipRect, visual.clips);
-      this.applyVisualEffects(visual.effects);
+      this.applyVisualClip(this.ctx, visual.clipRect, visual.clips);
+      this.applyVisualEffects(this.ctx, visual.effects, pixelScale);
       this.ctx.globalAlpha = visual.opacity ?? 1;
       this.ctx.globalCompositeOperation = visual.blendMode ?? 'source-over';
-      this.ctx.translate(visual.x ?? 0, visual.y ?? 0);
-      this.ctx.rotate(visual.rotation ?? 0);
-      this.ctx.scale(visual.scaleX ?? 1, visual.scaleY ?? 1);
-
-      switch (visual.kind) {
-        case 'shape':
-          this.renderShapeVisual(visual);
-          break;
-        case 'text':
-          this.renderTextVisual(visual);
-          break;
-        case 'image':
-          this.renderImageVisual(visual);
-          break;
-        case 'group':
-          break;
-      }
-
-      this.resetVisualEffects();
+      this.applyVisualTransform(this.ctx, visual);
+      this.renderVisualContent(this.ctx, visual);
+      this.resetVisualEffects(this.ctx);
       this.ctx.restore();
+      this.renderInnerShadowEffect(visual, baseTransform, pixelScale);
     }
     this.ctx.restore();
   }
 
-  private applyVisualClip(clipRect?: SceneRect, clips?: SceneClipNode[]) {
+  private getRenderSurface(key: string): RenderSurface {
+    let surface = this._effectSurfaces.get(key);
+    if (!surface) {
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d', { alpha: true }) as CanvasRenderingContext2D;
+      surface = { canvas, ctx };
+      this._effectSurfaces.set(key, surface);
+    }
+
+    if (surface.canvas.width !== this._canvas.width || surface.canvas.height !== this._canvas.height) {
+      surface.canvas.width = this._canvas.width;
+      surface.canvas.height = this._canvas.height;
+    }
+
+    return surface;
+  }
+
+  private resetContextState(ctx: CanvasRenderingContext2D) {
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.globalAlpha = 1;
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.filter = 'none';
+    ctx.shadowColor = 'transparent';
+    ctx.shadowBlur = 0;
+    ctx.shadowOffsetX = 0;
+    ctx.shadowOffsetY = 0;
+  }
+
+  private prepareRenderSurface(key: string) {
+    const surface = this.getRenderSurface(key);
+    this.resetContextState(surface.ctx);
+    surface.ctx.clearRect(0, 0, surface.canvas.width, surface.canvas.height);
+    return surface;
+  }
+
+  private getVisualPixelScale(baseTransform: DOMMatrix, visual: SceneVisualNode) {
+    const baseScaleX = Math.hypot(baseTransform.a, baseTransform.b);
+    const baseScaleY = Math.hypot(baseTransform.c, baseTransform.d);
+    const baseScale = ((baseScaleX || 1) + (baseScaleY || 1)) / 2;
+    const visualScale = (Math.abs(visual.scaleX ?? 1) + Math.abs(visual.scaleY ?? 1)) / 2;
+    return Math.max(0.001, baseScale * visualScale);
+  }
+
+  private applyVisualTransform(ctx: CanvasRenderingContext2D, visual: SceneVisualNode) {
+    ctx.translate(visual.x ?? 0, visual.y ?? 0);
+    ctx.rotate(visual.rotation ?? 0);
+    ctx.scale(visual.scaleX ?? 1, visual.scaleY ?? 1);
+  }
+
+  private applyVisualClip(ctx: CanvasRenderingContext2D, clipRect?: SceneRect, clips?: SceneClipNode[]) {
     if (clipRect) {
-      this.ctx.beginPath();
-      this.ctx.rect(clipRect.x, clipRect.y, clipRect.width, clipRect.height);
-      this.ctx.clip();
+      ctx.beginPath();
+      ctx.rect(clipRect.x, clipRect.y, clipRect.width, clipRect.height);
+      ctx.clip();
     }
 
     for (const clip of clips ?? []) {
-      this.applyClipNode(clip);
+      this.applyClipNode(ctx, clip);
     }
   }
 
-  private applyClipNode(clip: SceneClipNode) {
+  private applyClipNode(ctx: CanvasRenderingContext2D, clip: SceneClipNode) {
     switch (clip.shape) {
       case 'rect':
-        this.ctx.beginPath();
+        ctx.beginPath();
         if (clip.cornerRadius && clip.cornerRadius > 0) {
-          this.ctx.roundRect(clip.x, clip.y, clip.width, clip.height, clip.cornerRadius);
+          ctx.roundRect(clip.x, clip.y, clip.width, clip.height, clip.cornerRadius);
         } else {
-          this.ctx.rect(clip.x, clip.y, clip.width, clip.height);
+          ctx.rect(clip.x, clip.y, clip.width, clip.height);
         }
-        this.ctx.clip();
+        ctx.clip();
         break;
       case 'circle':
-        this.ctx.beginPath();
-        this.ctx.arc(clip.x, clip.y, clip.radius, 0, Math.PI * 2);
-        this.ctx.clip();
+        ctx.beginPath();
+        ctx.arc(clip.x, clip.y, clip.radius, 0, Math.PI * 2);
+        ctx.clip();
         break;
       case 'path': {
         const path = new Path2D(clip.pathData);
@@ -285,30 +330,117 @@ export class RouletteRenderer {
               .rotateSelf(((clip.rotation ?? 0) * 180) / Math.PI)
               .scaleSelf(clip.scaleX ?? 1, clip.scaleY ?? 1)
           );
-          this.ctx.clip(transformed);
+          ctx.clip(transformed);
           break;
         }
 
-        const transform = this.ctx.getTransform();
-        this.ctx.translate(clip.x, clip.y);
-        this.ctx.rotate(clip.rotation ?? 0);
-        this.ctx.scale(clip.scaleX ?? 1, clip.scaleY ?? 1);
-        this.ctx.clip(path);
-        this.ctx.setTransform(transform);
+        const transform = ctx.getTransform();
+        ctx.translate(clip.x, clip.y);
+        ctx.rotate(clip.rotation ?? 0);
+        ctx.scale(clip.scaleX ?? 1, clip.scaleY ?? 1);
+        ctx.clip(path);
+        ctx.setTransform(transform);
         break;
       }
     }
   }
 
-  private renderShapeVisual(visual: Extract<SceneVisualNode, { kind: 'shape' }>) {
-    const bounds = this.getVisualBounds(visual);
-    const fill = this.resolvePaint(visual.fill, bounds) ?? 'transparent';
-    const stroke = this.resolvePaint(visual.stroke, bounds) ?? 'transparent';
-    const strokeWidth = visual.strokeWidth ?? 0;
-    this.ctx.fillStyle = fill;
-    this.ctx.strokeStyle = stroke;
-    this.ctx.lineWidth = strokeWidth;
+  private renderVisualContent(ctx: CanvasRenderingContext2D, visual: SceneVisualNode) {
+    switch (visual.kind) {
+      case 'shape':
+        this.renderShapeVisual(ctx, visual);
+        break;
+      case 'text':
+        this.renderTextVisual(ctx, visual);
+        break;
+      case 'image':
+        this.renderImageVisual(ctx, visual);
+        break;
+      case 'group':
+        break;
+    }
+  }
 
+  private renderVisualMask(ctx: CanvasRenderingContext2D, visual: SceneVisualNode) {
+    switch (visual.kind) {
+      case 'shape':
+        this.renderShapeMask(ctx, visual);
+        break;
+      case 'text':
+        this.renderTextMask(ctx, visual);
+        break;
+      case 'image':
+        this.renderImageMask(ctx, visual);
+        break;
+      case 'group':
+        break;
+    }
+  }
+
+  private createVisualMaskSurface(visual: SceneVisualNode, baseTransform: DOMMatrix) {
+    const surface = this.prepareRenderSurface('mask');
+    surface.ctx.save();
+    surface.ctx.setTransform(baseTransform);
+    this.applyVisualClip(surface.ctx, visual.clipRect, visual.clips);
+    this.applyVisualTransform(surface.ctx, visual);
+    this.renderVisualMask(surface.ctx, visual);
+    surface.ctx.restore();
+    return surface;
+  }
+
+  private renderBackgroundBlurEffect(visual: SceneVisualNode, baseTransform: DOMMatrix, pixelScale: number) {
+    const blur = visual.effects?.find((effect) => effect.type === 'background-blur');
+    if (!blur || visual.kind === 'group') return;
+
+    const blurRadius = blur.radius * pixelScale;
+    if (blurRadius <= 0.01) return;
+
+    const backdrop = this.prepareRenderSurface('backdrop');
+    backdrop.ctx.drawImage(this._canvas, 0, 0);
+
+    const blurred = this.prepareRenderSurface('background-blur');
+    blurred.ctx.filter = `blur(${blurRadius}px)`;
+    blurred.ctx.drawImage(backdrop.canvas, 0, 0);
+    blurred.ctx.filter = 'none';
+
+    const mask = this.createVisualMaskSurface(visual, baseTransform);
+    blurred.ctx.globalCompositeOperation = 'destination-in';
+    blurred.ctx.drawImage(mask.canvas, 0, 0);
+
+    this.ctx.save();
+    this.resetContextState(this.ctx);
+    this.ctx.globalAlpha = visual.opacity ?? 1;
+    this.ctx.drawImage(blurred.canvas, 0, 0);
+    this.ctx.restore();
+  }
+
+  private renderInnerShadowEffect(visual: SceneVisualNode, baseTransform: DOMMatrix, pixelScale: number) {
+    const innerShadow = visual.effects?.find((effect) => effect.type === 'inner-shadow');
+    if (!innerShadow || visual.kind === 'group') return;
+
+    const shadow = this.prepareRenderSurface('inner-shadow');
+    const mask = this.createVisualMaskSurface(visual, baseTransform);
+    shadow.ctx.shadowColor = innerShadow.color;
+    shadow.ctx.shadowBlur = innerShadow.blur * pixelScale;
+    shadow.ctx.shadowOffsetX = innerShadow.offsetX * pixelScale;
+    shadow.ctx.shadowOffsetY = innerShadow.offsetY * pixelScale;
+    shadow.ctx.drawImage(mask.canvas, 0, 0);
+
+    this.resetContextState(shadow.ctx);
+    shadow.ctx.globalCompositeOperation = 'destination-in';
+    shadow.ctx.drawImage(mask.canvas, 0, 0);
+    shadow.ctx.globalCompositeOperation = 'destination-out';
+    shadow.ctx.drawImage(mask.canvas, 0, 0);
+
+    this.ctx.save();
+    this.resetContextState(this.ctx);
+    this.ctx.globalAlpha = visual.opacity ?? 1;
+    this.ctx.drawImage(shadow.canvas, 0, 0);
+    this.ctx.restore();
+  }
+
+  private createShapePath(visual: Extract<SceneVisualNode, { kind: 'shape' }>) {
+    const path = new Path2D();
     switch (visual.shape) {
       case 'rect': {
         const width = visual.width ?? 0;
@@ -316,81 +448,135 @@ export class RouletteRenderer {
         const x = -width / 2;
         const y = -height / 2;
         if (visual.cornerRadius && visual.cornerRadius > 0) {
-          this.ctx.beginPath();
-          this.ctx.roundRect(x, y, width, height, visual.cornerRadius);
-          if (fill !== 'transparent') this.ctx.fill();
-          if (strokeWidth > 0 && stroke !== 'transparent') this.ctx.stroke();
+          path.roundRect(x, y, width, height, visual.cornerRadius);
         } else {
-          if (fill !== 'transparent') this.ctx.fillRect(x, y, width, height);
-          if (strokeWidth > 0 && stroke !== 'transparent') this.ctx.strokeRect(x, y, width, height);
+          path.rect(x, y, width, height);
         }
-        break;
+        return path;
       }
       case 'circle': {
         const radius = visual.radius ?? Math.min(visual.width ?? 0, visual.height ?? 0) / 2;
-        this.ctx.beginPath();
-        this.ctx.arc(0, 0, radius, 0, Math.PI * 2);
-        if (fill !== 'transparent') this.ctx.fill();
-        if (strokeWidth > 0 && stroke !== 'transparent') this.ctx.stroke();
-        break;
+        path.arc(0, 0, radius, 0, Math.PI * 2);
+        return path;
       }
-      case 'polyline':
-        if (!visual.points?.length) break;
-        this.ctx.beginPath();
-        this.ctx.moveTo(visual.points[0][0], visual.points[0][1]);
+      case 'polyline': {
+        if (!visual.points?.length) return null;
+        path.moveTo(visual.points[0][0], visual.points[0][1]);
         for (let i = 1; i < visual.points.length; i++) {
-          this.ctx.lineTo(visual.points[i][0], visual.points[i][1]);
+          path.lineTo(visual.points[i][0], visual.points[i][1]);
         }
-        if (fill !== 'transparent') this.ctx.fill();
-        if (strokeWidth > 0 && stroke !== 'transparent') this.ctx.stroke();
-        break;
-      case 'path': {
-        if (!visual.pathData) break;
-        const path = new Path2D(visual.pathData);
-        if (fill !== 'transparent') this.ctx.fill(path);
-        if (strokeWidth > 0 && stroke !== 'transparent') this.ctx.stroke(path);
-        break;
+        return path;
       }
+      case 'path':
+        if (!visual.pathData) return null;
+        return new Path2D(visual.pathData);
     }
   }
 
-  private renderTextVisual(visual: Extract<SceneVisualNode, { kind: 'text' }>) {
-    this.ctx.font = `${visual.fontSize ?? 1}pt ${visual.fontFamily ?? 'sans-serif'}`;
-    this.ctx.fillStyle = visual.color ?? '#ffffff';
-    this.ctx.textAlign = visual.align ?? 'center';
-    this.ctx.textBaseline = 'middle';
-    this.ctx.fillText(visual.text, 0, 0);
+  private renderShapeVisual(ctx: CanvasRenderingContext2D, visual: Extract<SceneVisualNode, { kind: 'shape' }>) {
+    const path = this.createShapePath(visual);
+    if (!path) return;
+
+    const bounds = this.getVisualBounds(visual);
+    const fill = this.resolvePaint(ctx, visual.fill, bounds) ?? 'transparent';
+    const stroke = this.resolvePaint(ctx, visual.stroke, bounds) ?? 'transparent';
+    const strokeWidth = visual.strokeWidth ?? 0;
+
+    ctx.fillStyle = fill;
+    ctx.strokeStyle = stroke;
+    ctx.lineWidth = strokeWidth;
+    if (fill !== 'transparent') ctx.fill(path);
+    if (strokeWidth > 0 && stroke !== 'transparent') ctx.stroke(path);
   }
 
-  private renderImageVisual(visual: Extract<SceneVisualNode, { kind: 'image' }>) {
-    const image = this.getSceneImage(visual.src);
-    if (!image) return;
+  private renderShapeMask(ctx: CanvasRenderingContext2D, visual: Extract<SceneVisualNode, { kind: 'shape' }>) {
+    const path = this.createShapePath(visual);
+    if (!path) return;
+    const strokeWidth = visual.strokeWidth ?? 0;
+    ctx.fillStyle = '#ffffff';
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = strokeWidth;
+    if (visual.fill || !visual.stroke) {
+      ctx.fill(path);
+    }
+    if (strokeWidth > 0 && visual.stroke) {
+      ctx.stroke(path);
+    }
+  }
 
+  private renderTextVisual(ctx: CanvasRenderingContext2D, visual: Extract<SceneVisualNode, { kind: 'text' }>) {
+    ctx.font = `${visual.fontSize ?? 1}pt ${visual.fontFamily ?? 'sans-serif'}`;
+    ctx.fillStyle = visual.color ?? '#ffffff';
+    ctx.textAlign = visual.align ?? 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(visual.text, 0, 0);
+  }
+
+  private renderTextMask(ctx: CanvasRenderingContext2D, visual: Extract<SceneVisualNode, { kind: 'text' }>) {
+    ctx.font = `${visual.fontSize ?? 1}pt ${visual.fontFamily ?? 'sans-serif'}`;
+    ctx.fillStyle = '#ffffff';
+    ctx.textAlign = visual.align ?? 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(visual.text, 0, 0);
+  }
+
+  private drawImageShape(ctx: CanvasRenderingContext2D, visual: Extract<SceneVisualNode, { kind: 'image' }>, image: CanvasImageSource) {
     const drawImage = () => {
-      this.ctx.drawImage(image, -(visual.width / 2), -(visual.height / 2), visual.width, visual.height);
+      ctx.drawImage(image, -(visual.width / 2), -(visual.height / 2), visual.width, visual.height);
     };
 
     if (visual.clipShape === 'circle') {
-      this.ctx.save();
-      this.ctx.beginPath();
-      this.ctx.arc(0, 0, Math.min(visual.width, visual.height) / 2, 0, Math.PI * 2);
-      this.ctx.clip();
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(0, 0, Math.min(visual.width, visual.height) / 2, 0, Math.PI * 2);
+      ctx.clip();
       drawImage();
-      this.ctx.restore();
+      ctx.restore();
       return;
     }
 
     if (visual.clipShape === 'rect' && visual.cornerRadius && visual.cornerRadius > 0) {
-      this.ctx.save();
-      this.ctx.beginPath();
-      this.ctx.roundRect(-(visual.width / 2), -(visual.height / 2), visual.width, visual.height, visual.cornerRadius);
-      this.ctx.clip();
+      ctx.save();
+      ctx.beginPath();
+      ctx.roundRect(-(visual.width / 2), -(visual.height / 2), visual.width, visual.height, visual.cornerRadius);
+      ctx.clip();
       drawImage();
-      this.ctx.restore();
+      ctx.restore();
       return;
     }
 
     drawImage();
+  }
+
+  private renderImageVisual(ctx: CanvasRenderingContext2D, visual: Extract<SceneVisualNode, { kind: 'image' }>) {
+    const image = this.getSceneImage(visual.src);
+    if (!image) return;
+    this.drawImageShape(ctx, visual, image);
+  }
+
+  private renderImageMask(ctx: CanvasRenderingContext2D, visual: Extract<SceneVisualNode, { kind: 'image' }>) {
+    const image = this.getSceneImage(visual.src);
+    if (image) {
+      this.drawImageShape(ctx, visual, image);
+      return;
+    }
+
+    ctx.fillStyle = '#ffffff';
+    if (visual.clipShape === 'circle') {
+      ctx.beginPath();
+      ctx.arc(0, 0, Math.min(visual.width, visual.height) / 2, 0, Math.PI * 2);
+      ctx.fill();
+      return;
+    }
+
+    if (visual.clipShape === 'rect' && visual.cornerRadius && visual.cornerRadius > 0) {
+      ctx.beginPath();
+      ctx.roundRect(-(visual.width / 2), -(visual.height / 2), visual.width, visual.height, visual.cornerRadius);
+      ctx.fill();
+      return;
+    }
+
+    ctx.fillRect(-(visual.width / 2), -(visual.height / 2), visual.width, visual.height);
   }
 
   private getVisualBounds(visual: Extract<SceneVisualNode, { kind: 'shape' }>) {
@@ -440,27 +626,32 @@ export class RouletteRenderer {
     }
   }
 
-  private resolvePaint(paint: ScenePaint | undefined, bounds: { x: number; y: number; width: number; height: number }) {
+  private resolvePaint(
+    ctx: CanvasRenderingContext2D,
+    paint: ScenePaint | undefined,
+    bounds: { x: number; y: number; width: number; height: number }
+  ) {
     if (!paint) return undefined;
     if (typeof paint === 'string') return paint;
 
     switch (paint.type) {
       case 'linear-gradient':
-        return this.createLinearGradient(paint, bounds);
+        return this.createLinearGradient(ctx, paint, bounds);
       case 'radial-gradient':
-        return this.createRadialGradient(paint, bounds);
+        return this.createRadialGradient(ctx, paint, bounds);
       case 'conic-gradient':
-        return this.createConicGradient(paint, bounds);
+        return this.createConicGradient(ctx, paint, bounds);
       case 'diamond-gradient':
-        return this.createDiamondGradient(paint, bounds);
+        return this.createDiamondGradient(ctx, paint, bounds);
     }
   }
 
   private createLinearGradient(
+    ctx: CanvasRenderingContext2D,
     paint: SceneLinearGradientPaint,
     bounds: { x: number; y: number; width: number; height: number }
   ) {
-    const gradient = this.ctx.createLinearGradient(
+    const gradient = ctx.createLinearGradient(
       bounds.x + bounds.width * paint.x0,
       bounds.y + bounds.height * paint.y0,
       bounds.x + bounds.width * paint.x1,
@@ -475,6 +666,7 @@ export class RouletteRenderer {
   }
 
   private createRadialGradient(
+    ctx: CanvasRenderingContext2D,
     paint: SceneRadialGradientPaint,
     bounds: { x: number; y: number; width: number; height: number }
   ) {
@@ -483,7 +675,7 @@ export class RouletteRenderer {
     const x1 = bounds.x + bounds.width * paint.x1;
     const y1 = bounds.y + bounds.height * paint.y1;
     const radius = Math.max(0.001, Math.hypot(x1 - cx, y1 - cy));
-    const gradient = this.ctx.createRadialGradient(cx, cy, 0, cx, cy, radius);
+    const gradient = ctx.createRadialGradient(cx, cy, 0, cx, cy, radius);
 
     for (const stop of paint.stops) {
       gradient.addColorStop(stop.offset, stop.color);
@@ -493,6 +685,7 @@ export class RouletteRenderer {
   }
 
   private createConicGradient(
+    ctx: CanvasRenderingContext2D,
     paint: SceneConicGradientPaint,
     bounds: { x: number; y: number; width: number; height: number }
   ) {
@@ -502,13 +695,14 @@ export class RouletteRenderer {
     const y1 = bounds.y + bounds.height * paint.y1;
     const startAngle = Math.atan2(y1 - cy, x1 - cx);
     const createConicGradient = (
-      this.ctx as CanvasRenderingContext2D & {
+      ctx as CanvasRenderingContext2D & {
         createConicGradient?: (startAngle: number, x: number, y: number) => CanvasGradient;
       }
     ).createConicGradient;
 
     if (!createConicGradient) {
       return this.createLinearGradient(
+        ctx,
         {
           type: 'linear-gradient',
           x0: paint.x0,
@@ -521,7 +715,7 @@ export class RouletteRenderer {
       );
     }
 
-    const gradient = createConicGradient.call(this.ctx, startAngle, cx, cy);
+    const gradient = createConicGradient.call(ctx, startAngle, cx, cy);
     for (const stop of paint.stops) {
       gradient.addColorStop(stop.offset, stop.color);
     }
@@ -530,10 +724,12 @@ export class RouletteRenderer {
   }
 
   private createDiamondGradient(
+    ctx: CanvasRenderingContext2D,
     paint: SceneDiamondGradientPaint,
     bounds: { x: number; y: number; width: number; height: number }
   ) {
     return this.createRadialGradient(
+      ctx,
       {
         type: 'radial-gradient',
         x0: paint.x0,
@@ -546,7 +742,7 @@ export class RouletteRenderer {
     );
   }
 
-  private applyVisualEffects(effects?: SceneEffect[]) {
+  private applyVisualEffects(ctx: CanvasRenderingContext2D, effects: SceneEffect[] | undefined, pixelScale: number) {
     if (!effects?.length) return;
 
     let blurRadius = 0;
@@ -554,25 +750,25 @@ export class RouletteRenderer {
     const blur = effects.find((effect) => effect.type === 'layer-blur');
 
     if (blur?.type === 'layer-blur') {
-      blurRadius = blur.radius * initialZoom;
+      blurRadius = blur.radius * pixelScale;
     }
 
-    this.ctx.filter = blurRadius > 0 ? `blur(${blurRadius}px)` : 'none';
+    ctx.filter = blurRadius > 0 ? `blur(${blurRadius}px)` : 'none';
 
     if (shadow?.type === 'drop-shadow') {
-      this.ctx.shadowColor = shadow.color;
-      this.ctx.shadowBlur = shadow.blur * initialZoom;
-      this.ctx.shadowOffsetX = shadow.offsetX * initialZoom;
-      this.ctx.shadowOffsetY = shadow.offsetY * initialZoom;
+      ctx.shadowColor = shadow.color;
+      ctx.shadowBlur = shadow.blur * pixelScale;
+      ctx.shadowOffsetX = shadow.offsetX * pixelScale;
+      ctx.shadowOffsetY = shadow.offsetY * pixelScale;
     }
   }
 
-  private resetVisualEffects() {
-    this.ctx.filter = 'none';
-    this.ctx.shadowColor = 'transparent';
-    this.ctx.shadowBlur = 0;
-    this.ctx.shadowOffsetX = 0;
-    this.ctx.shadowOffsetY = 0;
+  private resetVisualEffects(ctx: CanvasRenderingContext2D) {
+    ctx.filter = 'none';
+    ctx.shadowColor = 'transparent';
+    ctx.shadowBlur = 0;
+    ctx.shadowOffsetX = 0;
+    ctx.shadowOffsetY = 0;
   }
 
   private renderEntities(entities: MapEntityState[]) {
