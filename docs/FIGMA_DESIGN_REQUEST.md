@@ -118,6 +118,8 @@ Scene/<scene-id>
 
 - visuals는 물리 판정에 사용되지 않습니다
 - 예쁘게 보여도 physics와 맞지 않으면 게임 플레이가 깨질 수 있습니다
+- 예외적으로 prototype/dummy 검증용이면 visual 레이어에 `body=static|kinematic`와 `collider=box|circle|polyline`를 붙여 collider proxy로 사용할 수 있습니다
+- 다만 production handoff는 여전히 `physics`와 `visuals`를 분리하는 방식을 우선합니다
 
 ### `anchors`
 

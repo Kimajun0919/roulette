@@ -168,6 +168,11 @@ function readStringField(metadata: Record<string, string>, key: string, fallback
   return metadata[key]?.trim() || fallback;
 }
 
+function readOptionalStringField(metadata: Record<string, string>, key: string) {
+  const value = metadata[key]?.trim();
+  return value ? value : undefined;
+}
+
 function toRadians(degrees: number) {
   return (degrees * Math.PI) / 180;
 }
@@ -433,8 +438,81 @@ function mapBlendMode(value: string | undefined): GlobalCompositeOperation | und
   }
 }
 
-function importPhysicsNode(node: FigmaSceneNode, frameBox: FigmaBoundingBox, pxPerUnit: number): MapEntity | null {
-  const metadata = parseMetadata(node.name, node.pluginData);
+function hasExplicitPhysicsMetadata(metadata: Record<string, string>) {
+  const body = readOptionalStringField(metadata, 'body');
+  const collider = readOptionalStringField(metadata, 'collider');
+  const obstacle = readOptionalStringField(metadata, 'obstacle');
+  const physics = readOptionalStringField(metadata, 'physics');
+
+  return (
+    body === 'static' ||
+    body === 'kinematic' ||
+    Boolean(collider) ||
+    obstacle === 'true' ||
+    obstacle === '1' ||
+    physics === 'true' ||
+    physics === '1'
+  );
+}
+
+function createPolylineFromBox(frameBox: FigmaBoundingBox, nodeBox: FigmaBoundingBox, pxPerUnit: number): [number, number][] {
+  const left = (nodeBox.x - frameBox.x) / pxPerUnit;
+  const top = (nodeBox.y - frameBox.y) / pxPerUnit;
+  const right = (nodeBox.x - frameBox.x + nodeBox.width) / pxPerUnit;
+  const bottom = (nodeBox.y - frameBox.y + nodeBox.height) / pxPerUnit;
+
+  return [
+    [left, top],
+    [right, top],
+    [right, bottom],
+    [left, bottom],
+    [left, top],
+  ];
+}
+
+function createPolylineFromEllipse(frameBox: FigmaBoundingBox, nodeBox: FigmaBoundingBox, pxPerUnit: number): [number, number][] {
+  const cx = (nodeBox.x - frameBox.x + nodeBox.width / 2) / pxPerUnit;
+  const cy = (nodeBox.y - frameBox.y + nodeBox.height / 2) / pxPerUnit;
+  const rx = nodeBox.width / pxPerUnit / 2;
+  const ry = nodeBox.height / pxPerUnit / 2;
+  const segments = 16;
+
+  return Array.from({ length: segments + 1 }, (_, index) => {
+    const angle = (index / segments) * Math.PI * 2;
+    return [cx + Math.cos(angle) * rx, cy + Math.sin(angle) * ry] as [number, number];
+  });
+}
+
+function inferPhysicsCollider(node: FigmaSceneNode, metadata: Record<string, string>) {
+  const explicit = readOptionalStringField(metadata, 'collider') ?? readOptionalStringField(metadata, 'shape');
+  if (explicit === 'box' || explicit === 'circle' || explicit === 'polyline') {
+    return explicit;
+  }
+
+  switch (node.type) {
+    case 'RECTANGLE':
+    case 'FRAME':
+    case 'INSTANCE':
+    case 'COMPONENT':
+    case 'COMPONENT_SET':
+      return 'box';
+    case 'ELLIPSE':
+      return 'circle';
+    case 'LINE':
+    case 'VECTOR':
+      return 'polyline';
+    default:
+      return null;
+  }
+}
+
+function importPhysicsNode(
+  node: FigmaSceneNode,
+  frameBox: FigmaBoundingBox,
+  pxPerUnit: number,
+  metadataOverride?: Record<string, string>
+): MapEntity | null {
+  const metadata = metadataOverride ?? parseMetadata(node.name, node.pluginData);
   const nodeBox = getBoundingBox(node);
   const position = toLocalCenter(frameBox, nodeBox, pxPerUnit);
   const bodyType = readStringField(metadata, 'body', 'static');
@@ -444,9 +522,16 @@ function importPhysicsNode(node: FigmaSceneNode, frameBox: FigmaBoundingBox, pxP
   const angularVelocity = readNumberField(metadata, 'angularVelocity', 0);
   const life = readNumberField(metadata, 'life', -1);
   const rotation = toRadians(node.rotation ?? 0);
+  const collider = inferPhysicsCollider(node, metadata);
+  const fillPaint = firstVisiblePaint(node.fills);
+  const color = readOptionalStringField(metadata, 'color') ?? toCssColor(fillPaint?.color, fillPaint?.opacity ?? 1);
 
-  switch (node.type) {
-    case 'RECTANGLE':
+  if (!collider) {
+    return null;
+  }
+
+  switch (collider) {
+    case 'box':
       return {
         position,
         type: entityType,
@@ -455,10 +540,11 @@ function importPhysicsNode(node: FigmaSceneNode, frameBox: FigmaBoundingBox, pxP
           width: nodeBox.width / pxPerUnit / 2,
           height: nodeBox.height / pxPerUnit / 2,
           rotation,
+          color,
         },
         props: { density, restitution, angularVelocity, life },
       };
-    case 'ELLIPSE': {
+    case 'circle': {
       const radius = Math.min(nodeBox.width, nodeBox.height) / pxPerUnit / 2;
       return {
         position,
@@ -466,19 +552,33 @@ function importPhysicsNode(node: FigmaSceneNode, frameBox: FigmaBoundingBox, pxP
         shape: {
           type: 'circle',
           radius,
+          color,
         },
         props: { density, restitution, angularVelocity, life },
       };
     }
-    case 'LINE':
-    case 'VECTOR': {
-      const explicitPoints = Array.isArray(node.points) && node.points.length >= 2 ? node.points : null;
-      const points = explicitPoints
-        ? explicitPoints.map((point) => toWorldPoint(frameBox, point, pxPerUnit))
-        : [
-            [(nodeBox.x - frameBox.x) / pxPerUnit, (nodeBox.y - frameBox.y) / pxPerUnit],
-            [(nodeBox.x - frameBox.x + nodeBox.width) / pxPerUnit, (nodeBox.y - frameBox.y + nodeBox.height) / pxPerUnit],
-          ];
+    case 'polyline': {
+      const explicitPoints = Array.isArray(node.points) && node.points.length >= 2
+        ? node.points.map((point) => toWorldPoint(frameBox, point, pxPerUnit))
+        : null;
+      const points =
+        explicitPoints ??
+        (node.type === 'ELLIPSE'
+          ? createPolylineFromEllipse(frameBox, nodeBox, pxPerUnit)
+          : node.type === 'RECTANGLE' ||
+              node.type === 'FRAME' ||
+              node.type === 'INSTANCE' ||
+              node.type === 'COMPONENT' ||
+              node.type === 'COMPONENT_SET' ||
+              node.type === 'GROUP' ||
+              node.type === 'BOOLEAN_OPERATION' ||
+              node.type === 'STAR' ||
+              node.type === 'POLYGON'
+            ? createPolylineFromBox(frameBox, nodeBox, pxPerUnit)
+            : [
+                [(nodeBox.x - frameBox.x) / pxPerUnit, (nodeBox.y - frameBox.y) / pxPerUnit],
+                [(nodeBox.x - frameBox.x + nodeBox.width) / pxPerUnit, (nodeBox.y - frameBox.y + nodeBox.height) / pxPerUnit],
+              ]);
 
       return {
         position: { x: 0, y: 0 },
@@ -487,13 +587,25 @@ function importPhysicsNode(node: FigmaSceneNode, frameBox: FigmaBoundingBox, pxP
           type: 'polyline',
           rotation: 0,
           points,
+          color,
         },
         props: { density, restitution, angularVelocity, life },
       };
     }
-    default:
-      return null;
   }
+}
+
+function importVisualPhysicsNode(node: FigmaSceneNode, frameBox: FigmaBoundingBox, pxPerUnit: number): MapEntity | null {
+  if (node.isMask) {
+    return null;
+  }
+
+  const metadata = parseMetadata(node.name, node.pluginData);
+  if (!hasExplicitPhysicsMetadata(metadata)) {
+    return null;
+  }
+
+  return importPhysicsNode(node, frameBox, pxPerUnit, metadata);
 }
 
 function importImageVisual(
@@ -790,9 +902,13 @@ export function importFigmaFrameToScene(frame: FigmaFrameNode, options: ImportOp
   const anchors = buildAnchors(anchorsGroup, frameBox, pxPerUnit);
   const sceneId = normalizeSceneId(options.sceneId) || normalizeSceneId(frame.name) || 'figma-scene';
   const sceneTitle = options.sceneTitle?.trim() || frame.name.trim() || sceneId;
-  const entities = flattenNodes(physicsGroup?.children ?? [])
+  const physicsEntities = flattenNodes(physicsGroup?.children ?? [])
     .filter((node) => node.visible !== false)
     .map((node) => importPhysicsNode(node, frameBox, pxPerUnit))
+    .filter((entity): entity is MapEntity => entity !== null);
+  const visualColliderEntities = flattenNodes(visualsGroup?.children ?? [])
+    .filter((node) => node.visible !== false)
+    .map((node) => importVisualPhysicsNode(node, frameBox, pxPerUnit))
     .filter((entity): entity is MapEntity => entity !== null);
   const visuals = flattenVisualNodes(visualsGroup?.children ?? [], frameBox, pxPerUnit)
     .filter(({ node }) => node.visible !== false)
@@ -806,7 +922,7 @@ export function importFigmaFrameToScene(frame: FigmaFrameNode, options: ImportOp
     goalY: anchors.goalY,
     zoomY: anchors.zoomY,
     anchors,
-    entities,
+    entities: [...physicsEntities, ...visualColliderEntities],
     visuals,
     source: options.source ?? 'figma',
   };

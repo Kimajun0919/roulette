@@ -272,7 +272,7 @@
           },
           {
             "id": "2:224",
-            "name": "Control Card | zIndex=-12",
+            "name": "Control Card | zIndex=-12 | body=static | collider=box",
             "type": "FRAME",
             "layoutMode": "VERTICAL",
             "clipsContent": true,

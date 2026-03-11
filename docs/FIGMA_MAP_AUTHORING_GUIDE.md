@@ -156,6 +156,15 @@ Recommendation:
 
 - Treat `visuals` as replaceable skin data.
 - Treat `physics` as the gameplay contract.
+- For production maps, keep gameplay collision in `physics`.
+- For prototype or dummy validation only, a visual node may opt into a collider proxy by adding `body=static|kinematic` and optional `collider=box|circle|polyline`.
+
+Prototype-only visual collider example:
+
+```text
+dummy-card | body=static | collider=box
+dummy-ring | body=static | collider=circle
+```
 
 ## Scene-Level Metadata To Request From Design
 

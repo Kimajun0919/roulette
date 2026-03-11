@@ -13,6 +13,7 @@ Box2D 기반 추첨/레이싱 프로젝트입니다. 현재 구조는 `React + V
 - raw Figma frame JSON -> `SceneDef` importer 스켈레톤 이상 구현 완료
 - Figma visuals 일부를 실제 캔버스에 렌더링 가능
 - Figma image paint, gradient, vector path, boolean path, clipsContent, isMask 일부 지원
+- visual dummy를 `body=` / `collider=` metadata로 physics obstacle proxy로 승격 가능
 
 ## 주요 기능
 
@@ -281,6 +282,9 @@ docs/
 - blend mode 일부
 - `clipsContent`
 - `isMask` 기반 vector/path mask
+- visual collider proxy
+  - visual node에 `body=static|kinematic`
+  - 필요 시 `collider=box|circle|polyline`
 - effects 일부
   - `DROP_SHADOW`
   - `LAYER_BLUR`
