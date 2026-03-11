@@ -1,5 +1,5 @@
 import type { MapEntity } from '../../engine-core/types/MapEntity.type';
-import type { SceneAnchors, SceneDef, SceneEffect, ScenePaint, SceneVisualNode } from '../sceneSchema';
+import type { SceneAnchors, SceneClipNode, SceneDef, SceneEffect, ScenePaint, SceneVisualNode } from '../sceneSchema';
 
 type FigmaPoint = {
   x: number;
@@ -74,6 +74,8 @@ export type FigmaSceneNode = {
   layoutMode?: string;
   clipsContent?: boolean;
   blendMode?: string;
+  isMask?: boolean;
+  maskType?: string;
 };
 
 export type FigmaFrameNode = FigmaSceneNode & {
@@ -285,7 +287,7 @@ function flattenNodes(nodes: FigmaSceneNode[]): FigmaSceneNode[] {
 
 type FlattenedVisualNode = {
   node: FigmaSceneNode;
-  clipRect?: SceneAnchors['minimapBounds'];
+  clips?: SceneClipNode[];
 };
 
 function isImageLikeNode(node: FigmaSceneNode, metadata: Record<string, string>) {
@@ -305,47 +307,84 @@ function toSceneRect(frameBox: FigmaBoundingBox, nodeBox: FigmaBoundingBox, pxPe
   };
 }
 
-function intersectRects(
-  left: SceneAnchors['minimapBounds'] | undefined,
-  right: SceneAnchors['minimapBounds'] | undefined
-): SceneAnchors['minimapBounds'] | undefined {
-  if (!left) return right;
-  if (!right) return left;
-
-  const x = Math.max(left.x, right.x);
-  const y = Math.max(left.y, right.y);
-  const maxX = Math.min(left.x + left.width, right.x + right.width);
-  const maxY = Math.min(left.y + left.height, right.y + right.height);
-
+function toRectClip(frameBox: FigmaBoundingBox, nodeBox: FigmaBoundingBox, pxPerUnit: number, cornerRadius?: number): SceneClipNode {
   return {
-    x,
-    y,
-    width: Math.max(0, maxX - x),
-    height: Math.max(0, maxY - y),
+    shape: 'rect',
+    ...toSceneRect(frameBox, nodeBox, pxPerUnit),
+    cornerRadius,
   };
+}
+
+function toClipPath(node: FigmaSceneNode, frameBox: FigmaBoundingBox, pxPerUnit: number): SceneClipNode | null {
+  const box = getBoundingBox(node);
+  switch (node.type) {
+    case 'RECTANGLE':
+    case 'FRAME':
+    case 'INSTANCE':
+    case 'COMPONENT':
+    case 'COMPONENT_SET':
+      return toRectClip(frameBox, box, pxPerUnit, (node.cornerRadius ?? 0) / pxPerUnit || undefined);
+    case 'ELLIPSE':
+      return {
+        shape: 'circle',
+        x: (box.x - frameBox.x + box.width / 2) / pxPerUnit,
+        y: (box.y - frameBox.y + box.height / 2) / pxPerUnit,
+        radius: Math.min(box.width, box.height) / pxPerUnit / 2,
+      };
+    case 'VECTOR':
+    case 'BOOLEAN_OPERATION':
+    case 'STAR':
+    case 'POLYGON': {
+      const pathData = joinGeometryPaths(node.fillGeometry) ?? joinGeometryPaths(node.strokeGeometry);
+      if (!pathData) return null;
+      return {
+        shape: 'path',
+        x: (box.x - frameBox.x) / pxPerUnit,
+        y: (box.y - frameBox.y) / pxPerUnit,
+        pathData,
+        rotation: toRadians(node.rotation ?? 0),
+        scaleX: 1 / pxPerUnit,
+        scaleY: 1 / pxPerUnit,
+      };
+    }
+    default:
+      return null;
+  }
 }
 
 function flattenVisualNodes(
   nodes: FigmaSceneNode[],
   frameBox: FigmaBoundingBox,
   pxPerUnit: number,
-  inheritedClip?: SceneAnchors['minimapBounds']
+  inheritedClips: SceneClipNode[] = []
 ): FlattenedVisualNode[] {
-  return nodes.flatMap((node) => {
-    const nodeBox = getBoundingBox(node);
-    const localClip = isFrameLikeNode(node) && node.clipsContent ? toSceneRect(frameBox, nodeBox, pxPerUnit) : undefined;
-    const nextClip = intersectRects(inheritedClip, localClip);
-    const current: FlattenedVisualNode = {
-      node,
-      clipRect: inheritedClip,
-    };
+  const flattened: FlattenedVisualNode[] = [];
+  const activeMasks: SceneClipNode[] = [];
 
-    if (!node.children?.length) {
-      return [current];
+  for (const node of nodes) {
+    const nodeClips = [...inheritedClips, ...activeMasks];
+    flattened.push({
+      node,
+      clips: nodeClips.length ? nodeClips : undefined,
+    });
+
+    if (node.children?.length) {
+      const childClips = [...nodeClips];
+      if (isFrameLikeNode(node) && node.clipsContent) {
+        childClips.push(toRectClip(frameBox, getBoundingBox(node), pxPerUnit, (node.cornerRadius ?? 0) / pxPerUnit || undefined));
+      }
+      flattened.push(...flattenVisualNodes(node.children, frameBox, pxPerUnit, childClips));
     }
 
-    return [current, ...flattenVisualNodes(node.children, frameBox, pxPerUnit, nextClip)];
-  });
+    if (node.isMask) {
+      const maskClip = toClipPath(node, frameBox, pxPerUnit);
+      if (maskClip) {
+        activeMasks.push(maskClip);
+      }
+    }
+  }
+
+  return flattened;
 }
 
 function mapBlendMode(value: string | undefined): GlobalCompositeOperation | undefined {
@@ -468,7 +507,7 @@ function importImageVisual(
   zIndex: number,
   layer: 'world' | 'screen',
   imageUrls: Record<string, string> | undefined,
-  clipRect: SceneAnchors['minimapBounds'] | undefined,
+  clips: SceneClipNode[] | undefined,
   blendMode: GlobalCompositeOperation | undefined
 ): SceneVisualNode | null {
   const imagePaint = firstVisiblePaint(node.fills);
@@ -491,7 +530,7 @@ function importImageVisual(
     zIndex,
     layer,
     blendMode,
-    clipRect,
+    clips,
     src: imageSrc,
     clipShape,
     cornerRadius,
@@ -505,8 +544,12 @@ function importVisualNode(
   pxPerUnit: number,
   order: number,
   imageUrls?: Record<string, string>,
-  clipRect?: SceneAnchors['minimapBounds']
+  clips?: SceneClipNode[]
 ): SceneVisualNode | null {
+  if (node.isMask) {
+    return null;
+  }
+
   const box = getBoundingBox(node);
   const center = toLocalCenter(frameBox, box, pxPerUnit);
   const metadata = parseMetadata(node.name, node.pluginData);
@@ -535,7 +578,7 @@ function importVisualNode(
         zIndex,
         layer,
         imageUrls,
-        clipRect,
+        clips,
         blendMode
       )
     : null;
@@ -568,7 +611,7 @@ function importVisualNode(
         zIndex,
         layer,
         blendMode,
-        clipRect,
+        clips,
         effects,
       };
     case 'ELLIPSE':
@@ -587,7 +630,7 @@ function importVisualNode(
         zIndex,
         layer,
         blendMode,
-        clipRect,
+        clips,
         effects,
       };
     case 'VECTOR':
@@ -615,7 +658,7 @@ function importVisualNode(
           zIndex,
           layer,
           blendMode,
-          clipRect,
+          clips,
           effects,
         };
       }
@@ -636,7 +679,7 @@ function importVisualNode(
           zIndex,
           layer,
           blendMode,
-          clipRect,
+          clips,
           effects,
         };
       }
@@ -659,7 +702,7 @@ function importVisualNode(
         zIndex,
         layer,
         blendMode,
-        clipRect,
+        clips,
         effects,
       };
     case 'TEXT': {
@@ -680,7 +723,7 @@ function importVisualNode(
         zIndex,
         layer,
         blendMode,
-        clipRect,
+        clips,
         effects,
       };
     }
@@ -753,7 +796,7 @@ export function importFigmaFrameToScene(frame: FigmaFrameNode, options: ImportOp
     .filter((entity): entity is MapEntity => entity !== null);
   const visuals = flattenVisualNodes(visualsGroup?.children ?? [], frameBox, pxPerUnit)
     .filter(({ node }) => node.visible !== false)
-    .map(({ node, clipRect }, index) => importVisualNode(node, frameBox, pxPerUnit, index, options.imageUrls, clipRect))
+    .map(({ node, clips }, index) => importVisualNode(node, frameBox, pxPerUnit, index, options.imageUrls, clips))
     .filter((node): node is SceneVisualNode => node !== null);
 
   return {

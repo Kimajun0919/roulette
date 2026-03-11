@@ -9,6 +9,7 @@ import type { ColorTheme } from './types/ColorTheme';
 import type { MapEntityState } from './types/MapEntity.type';
 import type { VectorLike } from './types/VectorLike';
 import type {
+  SceneClipNode,
   SceneConicGradientPaint,
   SceneDiamondGradientPaint,
   SceneEffect,
@@ -217,7 +218,7 @@ export class RouletteRenderer {
     this.ctx.save();
     for (const visual of items) {
       this.ctx.save();
-      this.applyVisualClip(visual.clipRect);
+      this.applyVisualClip(visual.clipRect, visual.clips);
       this.applyVisualEffects(visual.effects);
       this.ctx.globalAlpha = visual.opacity ?? 1;
       this.ctx.globalCompositeOperation = visual.blendMode ?? 'source-over';
@@ -245,11 +246,58 @@ export class RouletteRenderer {
     this.ctx.restore();
   }
 
-  private applyVisualClip(clipRect?: SceneRect) {
-    if (!clipRect) return;
-    this.ctx.beginPath();
-    this.ctx.rect(clipRect.x, clipRect.y, clipRect.width, clipRect.height);
-    this.ctx.clip();
+  private applyVisualClip(clipRect?: SceneRect, clips?: SceneClipNode[]) {
+    if (clipRect) {
+      this.ctx.beginPath();
+      this.ctx.rect(clipRect.x, clipRect.y, clipRect.width, clipRect.height);
+      this.ctx.clip();
+    }
+
+    for (const clip of clips ?? []) {
+      this.applyClipNode(clip);
+    }
+  }
+
+  private applyClipNode(clip: SceneClipNode) {
+    switch (clip.shape) {
+      case 'rect':
+        this.ctx.beginPath();
+        if (clip.cornerRadius && clip.cornerRadius > 0) {
+          this.ctx.roundRect(clip.x, clip.y, clip.width, clip.height, clip.cornerRadius);
+        } else {
+          this.ctx.rect(clip.x, clip.y, clip.width, clip.height);
+        }
+        this.ctx.clip();
+        break;
+      case 'circle':
+        this.ctx.beginPath();
+        this.ctx.arc(clip.x, clip.y, clip.radius, 0, Math.PI * 2);
+        this.ctx.clip();
+        break;
+      case 'path': {
+        const path = new Path2D(clip.pathData);
+        const transformed = new Path2D();
+        if (typeof transformed.addPath === 'function') {
+          transformed.addPath(
+            path,
+            new DOMMatrix()
+              .translateSelf(clip.x, clip.y)
+              .rotateSelf(((clip.rotation ?? 0) * 180) / Math.PI)
+              .scaleSelf(clip.scaleX ?? 1, clip.scaleY ?? 1)
+          );
+          this.ctx.clip(transformed);
+          break;
+        }
+
+        const transform = this.ctx.getTransform();
+        this.ctx.translate(clip.x, clip.y);
+        this.ctx.rotate(clip.rotation ?? 0);
+        this.ctx.scale(clip.scaleX ?? 1, clip.scaleY ?? 1);
+        this.ctx.clip(path);
+        this.ctx.setTransform(transform);
+        break;
+      }
+    }
   }
 
   private renderShapeVisual(visual: Extract<SceneVisualNode, { kind: 'shape' }>) {

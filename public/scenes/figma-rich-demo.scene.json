@@ -222,6 +222,55 @@
             ]
           },
           {
+            "id": "2:223b",
+            "name": "Masked Cluster",
+            "type": "GROUP",
+            "children": [
+              {
+                "id": "2:223c",
+                "name": "Mask Window | zIndex=-15",
+                "type": "BOOLEAN_OPERATION",
+                "isMask": true,
+                "maskType": "VECTOR",
+                "absoluteBoundingBox": { "x": 640, "y": 980, "width": 560, "height": 640 },
+                "fillGeometry": [
+                  {
+                    "path": "M 280 0 C 430 0 560 110 560 260 C 560 420 470 520 360 640 L 200 640 C 90 520 0 420 0 260 C 0 110 130 0 280 0 Z"
+                  }
+                ],
+                "fills": [
+                  {
+                    "type": "SOLID",
+                    "color": { "r": 1, "g": 1, "b": 1, "a": 1 }
+                  }
+                ]
+              },
+              {
+                "id": "2:223d",
+                "name": "Masked Badge Fill | zIndex=-14",
+                "type": "RECTANGLE",
+                "absoluteBoundingBox": { "x": 560, "y": 900, "width": 780, "height": 780 },
+                "cornerRadius": 32,
+                "fills": [
+                  { "type": "IMAGE", "imageRef": "badge-ref" }
+                ]
+              },
+              {
+                "id": "2:223e",
+                "name": "Masked Copy | zIndex=-13",
+                "type": "TEXT",
+                "absoluteBoundingBox": { "x": 720, "y": 1450, "width": 520, "height": 120 },
+                "characters": "vector mask clip",
+                "fontSize": 44,
+                "textAlignHorizontal": "CENTER",
+                "fontName": { "family": "Arial", "style": "Bold" },
+                "fills": [
+                  { "type": "SOLID", "color": { "r": 1, "g": 1, "b": 1, "a": 0.92 } }
+                ]
+              }
+            ]
+          },
+          {
             "id": "2:224",
             "name": "Control Card | zIndex=-12",
             "type": "FRAME",

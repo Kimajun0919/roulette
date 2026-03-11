@@ -33,9 +33,38 @@ export type SceneVisualBase = {
   opacity?: number;
   blendMode?: GlobalCompositeOperation;
   clipRect?: SceneRect;
+  clips?: SceneClipNode[];
   zIndex?: number;
   visible?: boolean;
 };
+
+export type SceneRectClip = {
+  shape: 'rect';
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  cornerRadius?: number;
+};
+
+export type SceneCircleClip = {
+  shape: 'circle';
+  x: number;
+  y: number;
+  radius: number;
+};
+
+export type ScenePathClip = {
+  shape: 'path';
+  x: number;
+  y: number;
+  pathData: string;
+  rotation?: number;
+  scaleX?: number;
+  scaleY?: number;
+};
+
+export type SceneClipNode = SceneRectClip | SceneCircleClip | ScenePathClip;
 
 export type SceneColorStop = {
   offset: number;
