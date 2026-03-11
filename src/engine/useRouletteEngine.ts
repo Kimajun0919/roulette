@@ -41,7 +41,7 @@ export function useRouletteEngine({
   const [engineReady, setEngineReady] = useState(false);
   const [goalWinner, setGoalWinner] = useState<string | null>(null);
   const [lastMessage, setLastMessage] = useState<string | null>(null);
-  const [maps, setMaps] = useState<Array<{ index: number; title: string }>>([]);
+  const [maps, setMaps] = useState<Array<{ id: string; index: number; title: string; source: 'legacy' | 'figma' }>>([]);
   const [themes, setThemes] = useState<string[]>([]);
   const [ranking, setRanking] = useState<RankingItem[]>([]);
   const [uiSnapshot, setUiSnapshot] = useState<UiSnapshot | null>(null);
@@ -175,9 +175,9 @@ export function useRouletteEngine({
     engine.setWinnerRank(winnerRank, winnerType, names.length);
   };
 
-  const setMap = (index: number) => {
+  const setMap = (sceneId: string) => {
     if (!engine || !engineReady) return;
-    engine.setMap(index);
+    engine.setScene(sceneId);
     engine.setNames(names);
     engine.setWinnerRank(winnerRank, winnerType, names.length);
   };

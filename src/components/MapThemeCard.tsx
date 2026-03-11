@@ -1,15 +1,15 @@
-type MapOption = { index: number; title: string };
+type MapOption = { id: string; index: number; title: string; source: 'legacy' | 'figma' };
 
 type Props = {
   engineReady: boolean;
   maps: MapOption[];
-  selectedMap: number;
-  onMapChange: (index: number) => void;
+  selectedSceneId: string;
+  onMapChange: (sceneId: string) => void;
   theme: string;
   onThemeChange: (theme: string) => void;
 };
 
-export function MapThemeCard({ engineReady, maps, selectedMap, onMapChange, theme, onThemeChange }: Props) {
+export function MapThemeCard({ engineReady, maps, selectedSceneId, onMapChange, theme, onThemeChange }: Props) {
   return (
     <>
       <div className="row">
@@ -17,9 +17,9 @@ export function MapThemeCard({ engineReady, maps, selectedMap, onMapChange, them
           <i className="icon map" />
           <span>Map</span>
         </label>
-        <select id="sltMap" value={selectedMap} onChange={(e) => onMapChange(Number(e.target.value))} disabled={!engineReady}>
+        <select id="sltMap" value={selectedSceneId} onChange={(e) => onMapChange(e.target.value)} disabled={!engineReady}>
           {maps.map((m) => (
-            <option key={m.index} value={m.index}>
+            <option key={m.id} value={m.id}>
               {m.title}
             </option>
           ))}

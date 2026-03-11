@@ -1,6 +1,6 @@
 import { Camera } from './camera';
 import { canvasHeight, canvasWidth, initialZoom, Skills, Themes, zoomThreshold } from './data/constants';
-import { type StageDef, stages } from './data/maps';
+import { defaultSceneId, getSceneById, getSceneByIndex, type StageDef, sceneOptions, scenes } from './data/maps';
 import type { GameObject } from './gameObject';
 import type { IPhysics } from './IPhysics';
 import { Marble } from './marble';
@@ -31,6 +31,7 @@ export class Roulette extends EventTarget {
   private _winners: Marble[] = [];
   private _particleManager = new ParticleManager();
   private _stage: StageDef | null = null;
+  private _sceneId: string = defaultSceneId;
 
   protected _camera: Camera = new Camera();
   protected _renderer: RouletteRenderer;
@@ -237,7 +238,8 @@ export class Roulette extends EventTarget {
     this.physics = new Box2dPhysics();
     await this.physics.init();
 
-    this._stage = stages[0];
+    this._stage = scenes[0] ?? null;
+    this._sceneId = this._stage?.id ?? defaultSceneId;
     this._loadMap();
   }
 
@@ -380,12 +382,7 @@ export class Roulette extends EventTarget {
   }
 
   public getMaps() {
-    return stages.map((stage, index) => {
-      return {
-        index,
-        title: stage.title,
-      };
-    });
+    return sceneOptions;
   }
 
   public getRankingSnapshot() {
@@ -408,14 +405,26 @@ export class Roulette extends EventTarget {
     return [...winners, ...pending];
   }
 
-  public setMap(index: number) {
-    if (index < 0 || index > stages.length - 1) {
-      throw new Error('Incorrect map number');
+  public setScene(sceneId: string) {
+    const scene = getSceneById(sceneId);
+    if (!scene) {
+      throw new Error('Incorrect scene id');
     }
+
     const names = this._marbles.map((marble) => marble.name);
-    this._stage = stages[index];
+    this._stage = scene;
+    this._sceneId = scene.id;
     this.setMarbles(names);
     this._camera.initializePosition();
+  }
+
+  public setMap(index: number) {
+    const scene = getSceneByIndex(index);
+    if (!scene) {
+      throw new Error('Incorrect map number');
+    }
+
+    this.setScene(scene.id);
   }
 
   public setFastForwardEnabled(enabled: boolean) {
@@ -435,6 +444,8 @@ export class Roulette extends EventTarget {
     if (!this._stage) return null;
 
     return {
+      sceneId: this._sceneId,
+      stageWidth: this._stage.width,
       stageGoalY: this._stage.goalY,
       camera: { x: this._camera.x, y: this._camera.y, zoom: this._camera.zoom },
       viewport: { width: this._renderer.width, height: this._renderer.height },

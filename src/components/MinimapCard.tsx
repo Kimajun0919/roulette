@@ -3,6 +3,8 @@ import { initialZoom } from '../engine-core/data/constants';
 import type { MapEntityState } from '../engine-core/types/MapEntity.type';
 
 type UiSnapshot = {
+  sceneId: string;
+  stageWidth: number;
   stageGoalY: number;
   camera: { x: number; y: number; zoom: number };
   viewport: { width: number; height: number };
@@ -16,14 +18,13 @@ type Props = {
   onHoverViewport: (pos?: { x: number; y: number }) => void;
 };
 
-const MAP_WIDTH = 26;
-
 export function MinimapCard({ snapshot, onHoverViewport }: Props) {
   if (!snapshot) return null;
 
+  const stageWidth = snapshot.stageWidth;
   const stageHeight = Math.max(30, snapshot.stageGoalY);
   const zoom = snapshot.camera.zoom * initialZoom;
-  const viewW = snapshot.viewport.width / zoom;
+  const viewW = Math.min(snapshot.viewport.width / zoom, stageWidth);
   const viewH = snapshot.viewport.height / zoom;
 
   const toDegrees = (rotation: number) => {
@@ -34,7 +35,7 @@ export function MinimapCard({ snapshot, onHoverViewport }: Props) {
   const handleMove: PointerEventHandler<SVGSVGElement> = (e) => {
     if (!snapshot) return;
     const rect = e.currentTarget.getBoundingClientRect();
-    const x = ((e.clientX - rect.left) / rect.width) * MAP_WIDTH;
+    const x = ((e.clientX - rect.left) / rect.width) * stageWidth;
     const y = ((e.clientY - rect.top) / rect.height) * stageHeight;
     onHoverViewport({ x, y });
   };
@@ -43,12 +44,12 @@ export function MinimapCard({ snapshot, onHoverViewport }: Props) {
     <aside className="minimap-overlay" aria-label="Stage minimap">
       <svg
         className="mini-map"
-        viewBox={`0 0 ${MAP_WIDTH} ${stageHeight}`}
+        viewBox={`0 0 ${stageWidth} ${stageHeight}`}
         preserveAspectRatio="none"
         onPointerMove={handleMove}
         onPointerLeave={() => onHoverViewport(undefined)}
       >
-        <rect width={MAP_WIDTH} height={stageHeight} fill={snapshot.theme.minimapBackground} />
+        <rect width={stageWidth} height={stageHeight} fill={snapshot.theme.minimapBackground} />
 
         {snapshot.entities.map((entity, index) => {
           const stroke = entity.shape.color ?? 'rgba(255,255,255,0.35)';

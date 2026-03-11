@@ -95,6 +95,10 @@ export class RouletteEngineAdapter {
     return this.roulette.getMaps();
   }
 
+  setScene(sceneId: string) {
+    this.roulette.setScene(sceneId);
+  }
+
   setMap(index: number) {
     this.roulette.setMap(index);
   }

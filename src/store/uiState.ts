@@ -1,5 +1,6 @@
 import type { AttendanceWeight } from '../api/haneulbit';
 import type { WinnerType } from '../engine/RouletteEngineAdapter';
+import { defaultSceneId } from '../maps/scenes';
 
 export type UiState = {
   namesInput: string;
@@ -8,7 +9,7 @@ export type UiState = {
   speed: number;
   autoRecording: boolean;
   useSkills: boolean;
-  selectedMap: number;
+  selectedSceneId: string;
   theme: string;
   mode: 'local' | 'api';
   apiBaseUrl: string;
@@ -25,7 +26,7 @@ export type UiAction =
   | { type: 'setSpeed'; value: number }
   | { type: 'setAutoRecording'; value: boolean }
   | { type: 'setUseSkills'; value: boolean }
-  | { type: 'setSelectedMap'; value: number }
+  | { type: 'setSelectedSceneId'; value: string }
   | { type: 'setTheme'; value: string }
   | { type: 'setMode'; value: 'local' | 'api' }
   | { type: 'setApiBaseUrl'; value: string }
@@ -47,8 +48,8 @@ export function uiReducer(state: UiState, action: UiAction): UiState {
       return { ...state, autoRecording: action.value };
     case 'setUseSkills':
       return { ...state, useSkills: action.value };
-    case 'setSelectedMap':
-      return { ...state, selectedMap: action.value };
+    case 'setSelectedSceneId':
+      return { ...state, selectedSceneId: action.value };
     case 'setTheme':
       return { ...state, theme: action.value };
     case 'setMode':
@@ -79,7 +80,7 @@ export function createInitialUiState(apiBaseUrl: string): UiState {
     speed: 1,
     autoRecording: true,
     useSkills: true,
-    selectedMap: 0,
+    selectedSceneId: defaultSceneId,
     theme: 'dark',
     mode: 'local',
     apiBaseUrl,

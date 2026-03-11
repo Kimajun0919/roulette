@@ -81,9 +81,9 @@ export function App() {
     };
   }, [goalWinner]);
 
-  const onMapChange = (index: number) => {
-    dispatch({ type: 'setSelectedMap', value: index });
-    setMap(index);
+  const onMapChange = (sceneId: string) => {
+    dispatch({ type: 'setSelectedSceneId', value: sceneId });
+    setMap(sceneId);
   };
 
   const closeNotice = () => {
@@ -129,7 +129,7 @@ export function App() {
             <MapThemeCard
               engineReady={engineReady}
               maps={maps}
-              selectedMap={state.selectedMap}
+              selectedSceneId={state.selectedSceneId}
               onMapChange={onMapChange}
               theme={state.theme}
               onThemeChange={(value) => dispatch({ type: 'setTheme', value })}
