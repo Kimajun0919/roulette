@@ -1,4 +1,5 @@
 import { stages, type StageDef as LegacyStageDef } from './stages';
+import { derivedScenes } from './derivedScenes';
 import type { SceneDef, SceneOption } from './sceneSchema';
 
 const DEFAULT_SCENE_WIDTH = 26;
@@ -28,7 +29,7 @@ function createSceneIds(defs: LegacyStageDef[]) {
 
 const sceneIds = createSceneIds(stages);
 
-export const scenes: SceneDef[] = stages.map((stage, index) => ({
+const legacyScenes: SceneDef[] = stages.map((stage, index) => ({
   id: sceneIds[index],
   title: stage.title,
   width: DEFAULT_SCENE_WIDTH,
@@ -48,6 +49,8 @@ export const scenes: SceneDef[] = stages.map((stage, index) => ({
   entities: stage.entities,
   source: 'legacy',
 }));
+
+export const scenes: SceneDef[] = [...legacyScenes, ...derivedScenes];
 
 export const defaultSceneId = scenes[0]?.id ?? '';
 
