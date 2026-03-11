@@ -172,6 +172,7 @@
             "id": "2:223",
             "name": "Boolean Ribbon | zIndex=-18",
             "type": "BOOLEAN_OPERATION",
+            "blendMode": "SCREEN",
             "absoluteBoundingBox": { "x": 940, "y": 1510, "width": 720, "height": 260 },
             "fillGeometry": [
               {
@@ -199,10 +200,33 @@
             ]
           },
           {
+            "id": "2:223a",
+            "name": "Spotlight Orb | zIndex=-16",
+            "type": "ELLIPSE",
+            "blendMode": "SCREEN",
+            "absoluteBoundingBox": { "x": 780, "y": 1280, "width": 1040, "height": 1040 },
+            "fills": [
+              {
+                "type": "GRADIENT_RADIAL",
+                "gradientHandlePositions": [
+                  { "x": 0.5, "y": 0.5 },
+                  { "x": 0.88, "y": 0.5 },
+                  { "x": 0.5, "y": 0.88 }
+                ],
+                "gradientStops": [
+                  { "position": 0, "color": { "r": 0.99, "g": 0.97, "b": 0.78, "a": 0.82 } },
+                  { "position": 0.45, "color": { "r": 0.87, "g": 0.76, "b": 0.32, "a": 0.42 } },
+                  { "position": 1, "color": { "r": 0.87, "g": 0.76, "b": 0.32, "a": 0 } }
+                ]
+              }
+            ]
+          },
+          {
             "id": "2:224",
             "name": "Control Card | zIndex=-12",
             "type": "FRAME",
             "layoutMode": "VERTICAL",
+            "clipsContent": true,
             "absoluteBoundingBox": { "x": 860, "y": 1940, "width": 880, "height": 520 },
             "cornerRadius": 32,
             "fills": [
@@ -245,6 +269,42 @@
                 "fontName": { "family": "Arial", "style": "Regular" },
                 "fills": [
                   { "type": "SOLID", "color": { "r": 1, "g": 1, "b": 1, "a": 0.78 } }
+                ]
+              },
+              {
+                "id": "2:226a",
+                "name": "Overflow Glow | zIndex=-9",
+                "type": "RECTANGLE",
+                "blendMode": "SCREEN",
+                "absoluteBoundingBox": { "x": 740, "y": 2290, "width": 1120, "height": 260 },
+                "cornerRadius": 130,
+                "fills": [
+                  {
+                    "type": "GRADIENT_ANGULAR",
+                    "gradientHandlePositions": [
+                      { "x": 0.5, "y": 0.5 },
+                      { "x": 1, "y": 0.5 },
+                      { "x": 0.5, "y": 1 }
+                    ],
+                    "gradientStops": [
+                      { "position": 0, "color": { "r": 0.3, "g": 0.75, "b": 0.97, "a": 0.65 } },
+                      { "position": 0.5, "color": { "r": 1, "g": 0.79, "b": 0.23, "a": 0.58 } },
+                      { "position": 1, "color": { "r": 0.3, "g": 0.75, "b": 0.97, "a": 0.65 } }
+                    ]
+                  }
+                ]
+              },
+              {
+                "id": "2:226b",
+                "name": "Overflow Label | zIndex=-8",
+                "type": "TEXT",
+                "absoluteBoundingBox": { "x": 930, "y": 2450, "width": 740, "height": 120 },
+                "characters": "clipped by frame bounds",
+                "fontSize": 44,
+                "textAlignHorizontal": "CENTER",
+                "fontName": { "family": "Arial", "style": "Bold" },
+                "fills": [
+                  { "type": "SOLID", "color": { "r": 0.96, "g": 0.99, "b": 1, "a": 0.92 } }
                 ]
               }
             ]

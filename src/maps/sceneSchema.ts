@@ -31,6 +31,8 @@ export type SceneVisualBase = {
   scaleX?: number;
   scaleY?: number;
   opacity?: number;
+  blendMode?: GlobalCompositeOperation;
+  clipRect?: SceneRect;
   zIndex?: number;
   visible?: boolean;
 };
@@ -49,7 +51,39 @@ export type SceneLinearGradientPaint = {
   stops: SceneColorStop[];
 };
 
-export type ScenePaint = string | SceneLinearGradientPaint;
+export type SceneRadialGradientPaint = {
+  type: 'radial-gradient';
+  x0: number;
+  y0: number;
+  x1: number;
+  y1: number;
+  stops: SceneColorStop[];
+};
+
+export type SceneConicGradientPaint = {
+  type: 'conic-gradient';
+  x0: number;
+  y0: number;
+  x1: number;
+  y1: number;
+  stops: SceneColorStop[];
+};
+
+export type SceneDiamondGradientPaint = {
+  type: 'diamond-gradient';
+  x0: number;
+  y0: number;
+  x1: number;
+  y1: number;
+  stops: SceneColorStop[];
+};
+
+export type ScenePaint =
+  | string
+  | SceneLinearGradientPaint
+  | SceneRadialGradientPaint
+  | SceneConicGradientPaint
+  | SceneDiamondGradientPaint;
 
 export type SceneDropShadowEffect = {
   type: 'drop-shadow';

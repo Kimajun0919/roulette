@@ -30,6 +30,7 @@ type FigmaPaint = {
   type?: string;
   visible?: boolean;
   opacity?: number;
+  blendMode?: string;
   color?: FigmaColor;
   gradientHandlePositions?: Array<{ x: number; y: number }>;
   gradientStops?: Array<{ position: number; color: FigmaColor }>;
@@ -72,6 +73,7 @@ export type FigmaSceneNode = {
   textAlignHorizontal?: string;
   layoutMode?: string;
   clipsContent?: boolean;
+  blendMode?: string;
 };
 
 export type FigmaFrameNode = FigmaSceneNode & {
@@ -182,20 +184,57 @@ function toLocalCenter(frameBox: FigmaBoundingBox, nodeBox: FigmaBoundingBox, px
 function toScenePaint(paint: FigmaPaint | undefined): ScenePaint | undefined {
   if (!paint) return undefined;
 
-  if (paint.type === 'GRADIENT_LINEAR' && paint.gradientHandlePositions && paint.gradientStops?.length) {
+  if (paint.gradientHandlePositions && paint.gradientStops?.length) {
     const [start, end] = paint.gradientHandlePositions;
     if (start && end) {
-      return {
-        type: 'linear-gradient',
-        x0: start.x,
-        y0: start.y,
-        x1: end.x,
-        y1: end.y,
-        stops: paint.gradientStops.map((stop) => ({
-          offset: stop.position,
-          color: toCssColor(stop.color, paint.opacity ?? 1) ?? 'rgba(255, 255, 255, 1)',
-        })),
-      };
+      const stops = paint.gradientStops.map((stop) => ({
+        offset: stop.position,
+        color: toCssColor(stop.color, paint.opacity ?? 1) ?? 'rgba(255, 255, 255, 1)',
+      }));
+
+      if (paint.type === 'GRADIENT_LINEAR') {
+        return {
+          type: 'linear-gradient',
+          x0: start.x,
+          y0: start.y,
+          x1: end.x,
+          y1: end.y,
+          stops,
+        };
+      }
+
+      if (paint.type === 'GRADIENT_RADIAL') {
+        return {
+          type: 'radial-gradient',
+          x0: start.x,
+          y0: start.y,
+          x1: end.x,
+          y1: end.y,
+          stops,
+        };
+      }
+
+      if (paint.type === 'GRADIENT_ANGULAR') {
+        return {
+          type: 'conic-gradient',
+          x0: start.x,
+          y0: start.y,
+          x1: end.x,
+          y1: end.y,
+          stops,
+        };
+      }
+
+      if (paint.type === 'GRADIENT_DIAMOND') {
+        return {
+          type: 'diamond-gradient',
+          x0: start.x,
+          y0: start.y,
+          x1: end.x,
+          y1: end.y,
+          stops,
+        };
+      }
     }
   }
 
@@ -244,12 +283,115 @@ function flattenNodes(nodes: FigmaSceneNode[]): FigmaSceneNode[] {
   return nodes.flatMap((node) => (node.children?.length ? [node, ...flattenNodes(node.children)] : [node]));
 }
 
+type FlattenedVisualNode = {
+  node: FigmaSceneNode;
+  clipRect?: SceneAnchors['minimapBounds'];
+};
+
 function isImageLikeNode(node: FigmaSceneNode, metadata: Record<string, string>) {
   return readStringField(metadata, 'kind', '') === 'image' || Boolean(metadata.src) || Boolean(firstVisiblePaint(node.fills)?.imageRef);
 }
 
 function isFrameLikeNode(node: FigmaSceneNode) {
   return node.type === 'FRAME' || node.type === 'INSTANCE' || node.type === 'COMPONENT' || node.type === 'COMPONENT_SET';
+}
+
+function toSceneRect(frameBox: FigmaBoundingBox, nodeBox: FigmaBoundingBox, pxPerUnit: number) {
+  return {
+    x: (nodeBox.x - frameBox.x) / pxPerUnit,
+    y: (nodeBox.y - frameBox.y) / pxPerUnit,
+    width: nodeBox.width / pxPerUnit,
+    height: nodeBox.height / pxPerUnit,
+  };
+}
+
+function intersectRects(
+  left: SceneAnchors['minimapBounds'] | undefined,
+  right: SceneAnchors['minimapBounds'] | undefined
+): SceneAnchors['minimapBounds'] | undefined {
+  if (!left) return right;
+  if (!right) return left;
+
+  const x = Math.max(left.x, right.x);
+  const y = Math.max(left.y, right.y);
+  const maxX = Math.min(left.x + left.width, right.x + right.width);
+  const maxY = Math.min(left.y + left.height, right.y + right.height);
+
+  return {
+    x,
+    y,
+    width: Math.max(0, maxX - x),
+    height: Math.max(0, maxY - y),
+  };
+}
+
+function flattenVisualNodes(
+  nodes: FigmaSceneNode[],
+  frameBox: FigmaBoundingBox,
+  pxPerUnit: number,
+  inheritedClip?: SceneAnchors['minimapBounds']
+): FlattenedVisualNode[] {
+  return nodes.flatMap((node) => {
+    const nodeBox = getBoundingBox(node);
+    const localClip = isFrameLikeNode(node) && node.clipsContent ? toSceneRect(frameBox, nodeBox, pxPerUnit) : undefined;
+    const nextClip = intersectRects(inheritedClip, localClip);
+    const current: FlattenedVisualNode = {
+      node,
+      clipRect: inheritedClip,
+    };
+
+    if (!node.children?.length) {
+      return [current];
+    }
+
+    return [current, ...flattenVisualNodes(node.children, frameBox, pxPerUnit, nextClip)];
+  });
+}
+
+function mapBlendMode(value: string | undefined): GlobalCompositeOperation | undefined {
+  if (!value) return undefined;
+
+  const normalized = value.trim().toUpperCase().replace(/-/g, '_');
+  switch (normalized) {
+    case 'NORMAL':
+    case 'PASS_THROUGH':
+    case 'SOURCE_OVER':
+      return 'source-over';
+    case 'DARKEN':
+      return 'darken';
+    case 'MULTIPLY':
+      return 'multiply';
+    case 'LINEAR_BURN':
+    case 'COLOR_BURN':
+      return 'color-burn';
+    case 'LIGHTEN':
+      return 'lighten';
+    case 'SCREEN':
+      return 'screen';
+    case 'LINEAR_DODGE':
+    case 'COLOR_DODGE':
+      return 'color-dodge';
+    case 'OVERLAY':
+      return 'overlay';
+    case 'SOFT_LIGHT':
+      return 'soft-light';
+    case 'HARD_LIGHT':
+      return 'hard-light';
+    case 'DIFFERENCE':
+      return 'difference';
+    case 'EXCLUSION':
+      return 'exclusion';
+    case 'HUE':
+      return 'hue';
+    case 'SATURATION':
+      return 'saturation';
+    case 'COLOR':
+      return 'color';
+    case 'LUMINOSITY':
+      return 'luminosity';
+    default:
+      return undefined;
+  }
 }
 
 function importPhysicsNode(node: FigmaSceneNode, frameBox: FigmaBoundingBox, pxPerUnit: number): MapEntity | null {
@@ -325,7 +467,9 @@ function importImageVisual(
   opacity: number,
   zIndex: number,
   layer: 'world' | 'screen',
-  imageUrls: Record<string, string> | undefined
+  imageUrls: Record<string, string> | undefined,
+  clipRect: SceneAnchors['minimapBounds'] | undefined,
+  blendMode: GlobalCompositeOperation | undefined
 ): SceneVisualNode | null {
   const imagePaint = firstVisiblePaint(node.fills);
   const imageSrc = readStringField(metadata, 'src', imagePaint?.imageRef ? imageUrls?.[imagePaint.imageRef] ?? '' : '');
@@ -346,6 +490,8 @@ function importImageVisual(
     opacity,
     zIndex,
     layer,
+    blendMode,
+    clipRect,
     src: imageSrc,
     clipShape,
     cornerRadius,
@@ -358,7 +504,8 @@ function importVisualNode(
   frameBox: FigmaBoundingBox,
   pxPerUnit: number,
   order: number,
-  imageUrls?: Record<string, string>
+  imageUrls?: Record<string, string>,
+  clipRect?: SceneAnchors['minimapBounds']
 ): SceneVisualNode | null {
   const box = getBoundingBox(node);
   const center = toLocalCenter(frameBox, box, pxPerUnit);
@@ -374,8 +521,23 @@ function importVisualNode(
   const strokeWidth = readNumberField(metadata, 'strokeWidth', (node.strokeWeight ?? 0) / pxPerUnit);
   const rotation = toRadians(node.rotation ?? 0);
   const effects = toSceneEffects(node.effects, pxPerUnit);
+  const blendMode =
+    mapBlendMode(metadata.blendMode) ?? mapBlendMode(node.blendMode) ?? mapBlendMode(fillPaint?.blendMode);
   const imageVisual = isImageLikeNode(node, metadata)
-    ? importImageVisual(node, metadata, box, center, pxPerUnit, rotation, opacity, zIndex, layer, imageUrls)
+    ? importImageVisual(
+        node,
+        metadata,
+        box,
+        center,
+        pxPerUnit,
+        rotation,
+        opacity,
+        zIndex,
+        layer,
+        imageUrls,
+        clipRect,
+        blendMode
+      )
     : null;
   if (imageVisual) {
     return imageVisual;
@@ -405,6 +567,8 @@ function importVisualNode(
         opacity,
         zIndex,
         layer,
+        blendMode,
+        clipRect,
         effects,
       };
     case 'ELLIPSE':
@@ -422,6 +586,8 @@ function importVisualNode(
         opacity,
         zIndex,
         layer,
+        blendMode,
+        clipRect,
         effects,
       };
     case 'VECTOR':
@@ -448,6 +614,8 @@ function importVisualNode(
           opacity,
           zIndex,
           layer,
+          blendMode,
+          clipRect,
           effects,
         };
       }
@@ -467,6 +635,8 @@ function importVisualNode(
           opacity,
           zIndex,
           layer,
+          blendMode,
+          clipRect,
           effects,
         };
       }
@@ -488,6 +658,8 @@ function importVisualNode(
         opacity,
         zIndex,
         layer,
+        blendMode,
+        clipRect,
         effects,
       };
     case 'TEXT': {
@@ -507,6 +679,8 @@ function importVisualNode(
         opacity,
         zIndex,
         layer,
+        blendMode,
+        clipRect,
         effects,
       };
     }
@@ -577,9 +751,9 @@ export function importFigmaFrameToScene(frame: FigmaFrameNode, options: ImportOp
     .filter((node) => node.visible !== false)
     .map((node) => importPhysicsNode(node, frameBox, pxPerUnit))
     .filter((entity): entity is MapEntity => entity !== null);
-  const visuals = flattenNodes(visualsGroup?.children ?? [])
-    .filter((node) => node.visible !== false)
-    .map((node, index) => importVisualNode(node, frameBox, pxPerUnit, index, options.imageUrls))
+  const visuals = flattenVisualNodes(visualsGroup?.children ?? [], frameBox, pxPerUnit)
+    .filter(({ node }) => node.visible !== false)
+    .map(({ node, clipRect }, index) => importVisualNode(node, frameBox, pxPerUnit, index, options.imageUrls, clipRect))
     .filter((node): node is SceneVisualNode => node !== null);
 
   return {

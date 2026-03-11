@@ -8,7 +8,16 @@ import type { ParticleManager } from './particleManager';
 import type { ColorTheme } from './types/ColorTheme';
 import type { MapEntityState } from './types/MapEntity.type';
 import type { VectorLike } from './types/VectorLike';
-import type { SceneEffect, SceneLinearGradientPaint, ScenePaint, SceneVisualNode } from '../maps/sceneSchema';
+import type {
+  SceneConicGradientPaint,
+  SceneDiamondGradientPaint,
+  SceneEffect,
+  SceneLinearGradientPaint,
+  ScenePaint,
+  SceneRadialGradientPaint,
+  SceneRect,
+  SceneVisualNode,
+} from '../maps/sceneSchema';
 
 export type RenderParameters = {
   camera: Camera;
@@ -207,9 +216,11 @@ export class RouletteRenderer {
 
     this.ctx.save();
     for (const visual of items) {
-      const transform = this.ctx.getTransform();
+      this.ctx.save();
+      this.applyVisualClip(visual.clipRect);
       this.applyVisualEffects(visual.effects);
       this.ctx.globalAlpha = visual.opacity ?? 1;
+      this.ctx.globalCompositeOperation = visual.blendMode ?? 'source-over';
       this.ctx.translate(visual.x ?? 0, visual.y ?? 0);
       this.ctx.rotate(visual.rotation ?? 0);
       this.ctx.scale(visual.scaleX ?? 1, visual.scaleY ?? 1);
@@ -228,11 +239,17 @@ export class RouletteRenderer {
           break;
       }
 
-      this.ctx.setTransform(transform);
-      this.ctx.globalAlpha = 1;
       this.resetVisualEffects();
+      this.ctx.restore();
     }
     this.ctx.restore();
+  }
+
+  private applyVisualClip(clipRect?: SceneRect) {
+    if (!clipRect) return;
+    this.ctx.beginPath();
+    this.ctx.rect(clipRect.x, clipRect.y, clipRect.width, clipRect.height);
+    this.ctx.clip();
   }
 
   private renderShapeVisual(visual: Extract<SceneVisualNode, { kind: 'shape' }>) {
@@ -378,7 +395,17 @@ export class RouletteRenderer {
   private resolvePaint(paint: ScenePaint | undefined, bounds: { x: number; y: number; width: number; height: number }) {
     if (!paint) return undefined;
     if (typeof paint === 'string') return paint;
-    return this.createLinearGradient(paint, bounds);
+
+    switch (paint.type) {
+      case 'linear-gradient':
+        return this.createLinearGradient(paint, bounds);
+      case 'radial-gradient':
+        return this.createRadialGradient(paint, bounds);
+      case 'conic-gradient':
+        return this.createConicGradient(paint, bounds);
+      case 'diamond-gradient':
+        return this.createDiamondGradient(paint, bounds);
+    }
   }
 
   private createLinearGradient(
@@ -397,6 +424,78 @@ export class RouletteRenderer {
     }
 
     return gradient;
+  }
+
+  private createRadialGradient(
+    paint: SceneRadialGradientPaint,
+    bounds: { x: number; y: number; width: number; height: number }
+  ) {
+    const cx = bounds.x + bounds.width * paint.x0;
+    const cy = bounds.y + bounds.height * paint.y0;
+    const x1 = bounds.x + bounds.width * paint.x1;
+    const y1 = bounds.y + bounds.height * paint.y1;
+    const radius = Math.max(0.001, Math.hypot(x1 - cx, y1 - cy));
+    const gradient = this.ctx.createRadialGradient(cx, cy, 0, cx, cy, radius);
+
+    for (const stop of paint.stops) {
+      gradient.addColorStop(stop.offset, stop.color);
+    }
+
+    return gradient;
+  }
+
+  private createConicGradient(
+    paint: SceneConicGradientPaint,
+    bounds: { x: number; y: number; width: number; height: number }
+  ) {
+    const cx = bounds.x + bounds.width * paint.x0;
+    const cy = bounds.y + bounds.height * paint.y0;
+    const x1 = bounds.x + bounds.width * paint.x1;
+    const y1 = bounds.y + bounds.height * paint.y1;
+    const startAngle = Math.atan2(y1 - cy, x1 - cx);
+    const createConicGradient = (
+      this.ctx as CanvasRenderingContext2D & {
+        createConicGradient?: (startAngle: number, x: number, y: number) => CanvasGradient;
+      }
+    ).createConicGradient;
+
+    if (!createConicGradient) {
+      return this.createLinearGradient(
+        {
+          type: 'linear-gradient',
+          x0: paint.x0,
+          y0: paint.y0,
+          x1: paint.x1,
+          y1: paint.y1,
+          stops: paint.stops,
+        },
+        bounds
+      );
+    }
+
+    const gradient = createConicGradient.call(this.ctx, startAngle, cx, cy);
+    for (const stop of paint.stops) {
+      gradient.addColorStop(stop.offset, stop.color);
+    }
+
+    return gradient;
+  }
+
+  private createDiamondGradient(
+    paint: SceneDiamondGradientPaint,
+    bounds: { x: number; y: number; width: number; height: number }
+  ) {
+    return this.createRadialGradient(
+      {
+        type: 'radial-gradient',
+        x0: paint.x0,
+        y0: paint.y0,
+        x1: paint.x1,
+        y1: paint.y1,
+        stops: paint.stops,
+      },
+      bounds
+    );
   }
 
   private applyVisualEffects(effects?: SceneEffect[]) {
