@@ -220,41 +220,26 @@ export class Roulette extends EventTarget {
     this._camera.initializePosition({ x: cameraStart.x, y: cameraStart.y }, cameraStart.zoom);
   }
 
-  private _getSpawnPosition(order: number, totalCount: number) {
-    if (!this._stage?.anchors.spawnCenter) {
-      const maxLine = Math.ceil(totalCount / 10);
-      const line = Math.floor(order / 10);
-      const lineDelta = -Math.max(0, Math.ceil(maxLine - 5));
-      return {
-        x: 10.25 + (order % 10) * 0.6,
-        y: maxLine - line + lineDelta,
-      };
-    }
-
-    const columns = Math.min(totalCount, 10);
-    const row = Math.floor(order / 10);
-    const col = order % 10;
-    const rows = Math.ceil(totalCount / 10);
-    const center = this._stage.anchors.spawnCenter;
+  private _getSpawnPosition(order: number) {
+    const center = this._stage?.anchors.spawnCenter ?? { x: 12.95, y: 2 };
+    const columns = 20;
+    const col = order % columns;
+    const row = Math.floor(order / columns);
 
     return {
       x: center.x + (col - (columns - 1) / 2) * 0.6,
-      y: center.y + ((rows - 1) / 2 - row),
+      y: center.y - row,
     };
   }
 
-  private _getSpawnCameraCenter(totalCount: number) {
-    if (!this._stage?.anchors.spawnCenter) {
-      const cols = Math.min(totalCount, 10);
-      const rows = Math.ceil(totalCount / 10);
-      const lineDelta = -Math.max(0, Math.ceil(rows - 5));
-      return {
-        x: 10.25 + (cols - 1) * 0.3,
-        y: (1 + rows) / 2 + lineDelta,
-      };
-    }
-
-    return this._stage.anchors.spawnCenter;
+  private _getSpawnCameraStart() {
+    const cameraStart = this._stage?.anchors.cameraStart;
+    const spawnCenter = this._stage?.anchors.spawnCenter ?? { x: 12.95, y: 2 };
+    return {
+      x: spawnCenter.x,
+      y: spawnCenter.y,
+      zoom: cameraStart?.zoom ?? 3,
+    };
   }
 
   private _render() {
@@ -386,29 +371,15 @@ export class Roulette extends EventTarget {
       if (member) {
         for (let j = 0; j < member.count; j++) {
           const order = orders.pop() || 0;
-          this._marbles.push(new Marble(this.physics, order, totalCount, member.name, member.weight, this._getSpawnPosition(order, totalCount)));
+          this._marbles.push(new Marble(this.physics, order, totalCount, member.name, member.weight, this._getSpawnPosition(order)));
         }
       }
     });
     this._totalMarbleCount = totalCount;
 
-    // 카메라를 구슬 생성 위치 중앙으로 이동 + 줌인
     if (totalCount > 0) {
-      const cols = Math.min(totalCount, 10);
-      const rows = Math.ceil(totalCount / 10);
-      const spawnCenter = this._getSpawnCameraCenter(totalCount);
-
-      const spawnWidth = Math.max((cols - 1) * 0.6, 1);
-      const spawnHeight = Math.max(rows - 1, 1);
-      const margin = 3;
-      const viewW = canvasWidth / initialZoom;
-      const viewH = canvasHeight / initialZoom;
-      const zoom = Math.max(
-        1.5,
-        Math.min(Math.min(viewW / (spawnWidth + margin * 2), viewH / (spawnHeight + margin * 2)), 3)
-      );
-
-      this._camera.initializePosition({ x: spawnCenter.x, y: spawnCenter.y }, zoom);
+      const spawnCameraStart = this._getSpawnCameraStart();
+      this._camera.initializePosition({ x: spawnCameraStart.x, y: spawnCameraStart.y }, spawnCameraStart.zoom);
     }
   }
 
